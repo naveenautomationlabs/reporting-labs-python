@@ -109,3 +109,23 @@ def test_disabled_writes_nothing(pytester: pytest.Pytester):
     pytester.makepyfile(test_d="def test_it(): pass")
     pytester.runpytest_subprocess("-p", "no:cacheprovider", "--no-rl")
     assert not (pytester.path / "reporting-labs").exists()
+
+
+def test_timeout_and_xpass_outcomes(pytester: pytest.Pytester):
+    pytester.makepyfile(
+        test_t="""
+        import time, pytest
+
+        @pytest.mark.timeout(1)
+        def test_times_out():
+            time.sleep(3)
+
+        @pytest.mark.xfail(reason="should be fixed")
+        def test_xpasses():
+            assert True
+        """
+    )
+    _run(pytester, "-p", "no:cacheprovider", "--timeout=5")
+    by = {t["title"]: t["outcome"] for t in _report(pytester)["tests"]}
+    assert by["test_times_out"] == "timedOut"
+    assert by["test_xpasses"] == "failed"

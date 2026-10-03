@@ -39,6 +39,7 @@ class TestRecord:
     skip_reason: Optional[str] = None
     forced_outcome: Optional[str] = None      # set by the framework: 'skipped', 'interrupted', 'timedOut'
     expected_failure: bool = False
+    xpass: bool = False
     column: Optional[int] = None
 
     @property
@@ -190,6 +191,8 @@ class Run:
             return t.forced_outcome, t.note, False
         xfail = t.expected_status == "failed"
         if last.status == "passed":
+            if t.xpass:
+                return "failed", t.note or "Passed, but the test is marked xfail. If the bug is fixed, remove the marker.", False
             if xfail:
                 return "failed", "Passed, but the test is marked as an expected failure. If the bug is fixed, remove the marker.", False
             if any(a.status in ("failed", "timedOut") for a in t.attempts[:-1]):

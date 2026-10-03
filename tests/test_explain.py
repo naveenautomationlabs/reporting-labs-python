@@ -89,3 +89,13 @@ def test_python_attribute_error_none():
 def test_plain_raise():
     kind, s = k("RuntimeError: payment service did not start", "RuntimeError")
     assert kind == "thrown" and "payment service" in s
+
+
+def test_pytest_timeout():
+    kind, s = k("Failed: Timeout (>1.0s) from pytest-timeout.", "Failed")
+    assert kind == "test-timeout" and "1.0s" in s
+
+
+def test_selenium_selector_with_quotes():
+    kind, s = k('NoSuchElementException: Message: no such element: Unable to locate element: {"method":"css selector","selector":"[id=\"nope\"]"}', "NoSuchElementException")
+    assert kind == "not-found" and '[id="nope"]' in s

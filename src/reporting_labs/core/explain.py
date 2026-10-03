@@ -224,7 +224,7 @@ def _selenium(msg: str, first: str, t: str) -> Optional[Dict[str, Any]]:
         return None
     loc = _pick(msg, r"Unable to locate element:\s*\{?\"?method\"?:\s*\"?([^\"}\n]+)\"?,\s*\"?selector\"?:\s*\"?([^\"}\n]+)")
     sel = None
-    m = re.search(r"\"method\":\s*\"([^\"]+)\",\s*\"selector\":\s*\"((?:[^\"\\]|\\.)+)\"", msg) or re.search(r"\{\"?method\"?:\s*\"?([\w ]+)\"?,\s*\"?selector\"?:\s*\"?(.+?)\"?\}", msg)
+    m = re.search(r"\"method\":\s*\"([^\"]+)\",\s*\"selector\":\s*\"(.+)\"\s*\}", msg) or re.search(r"\{\"?method\"?:\s*\"?([\w ]+)\"?,\s*\"?selector\"?:\s*\"?(.+?)\"?\}", msg)
     if m:
         sel = f"{m.group(1)}: {m.group(2).replace(chr(92) + chr(34), chr(34))}"
     kind = t or _pick(first, r"^(\w+Exception)") or ""
@@ -383,9 +383,9 @@ def _assertion(msg: str, first: str, t: str) -> Optional[Dict[str, Any]]:
 def _python(msg: str, first: str, t: str) -> Optional[Dict[str, Any]]:
     kind = t or _pick(first, r"^(\w+(?:Error|Exception|Failed|Interrupt))\b") or ""
     body = re.sub(r"^\w+(?:Error|Exception):?\s*", "", first).strip()
-    if kind in ("Failed",) and re.search(r"Timeout >\s*[\d.]+s", msg):
-        secs_ = _pick(msg, r"Timeout >\s*([\d.]+)s")
-        return _out("test-timeout", f"The whole test took longer than {secs_}s.", "Find the slow step in the Steps list below. Raise the timeout only if the flow is really that long.", timeoutMs=float(secs_) * 1000 if secs_ else None)
+    if re.search(r"Timeout\s*\(?>?\s*[\d.]+s", msg) and ("pytest-timeout" in msg or kind in ("Failed", "")):
+        secs_ = _pick(msg, r"Timeout\s*\(?>?\s*([\d.]+)s")
+        return _out("test-timeout", f"The test took longer than {secs_}s and was stopped." if secs_ else "The test timed out and was stopped.", "Find the slow step in the Steps list below. Raise the timeout only if the flow is really that long.", timeoutMs=float(secs_) * 1000 if secs_ else None)
     if "Timeout" in kind and not re.search(r"https?://", msg):
         return _out("test-timeout", short(body or "The test timed out.", 140), "Find the slow step in the Steps list below.")
     if kind in ("FileNotFoundError",) or re.search(r"No such file or directory", msg):

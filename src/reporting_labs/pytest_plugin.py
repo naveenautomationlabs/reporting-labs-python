@@ -341,9 +341,10 @@ class Controller:
                     status = "skipped"
             elif hasattr(report, "wasxfail"):
                 # xpass: passed although marked xfail (non-strict). Strict xpass arrives as failed above.
-                t.expected_status = "failed"
+                # Keep the attempt passed; the xpass flag makes the outcome "failed" so the marker gets removed.
+                t.xpass = True
                 t.note = "Passed, but the test is marked xfail. If the bug is fixed, remove the marker."
-                status = "failed"
+                status = "passed"
         elif report.when == "teardown":
             if report.failed and status in ("passed", "skipped"):
                 status = "failed"
@@ -404,4 +405,4 @@ def _skip_reason(report: pytest.TestReport) -> Optional[str]:
 
 def _is_timeout(report: pytest.TestReport) -> bool:
     text = report.longreprtext or ""
-    return bool(re.search(r"Failed: Timeout >\s*[\d.]+s|\bTimeout >\s*[\d.]+s\b", text))
+    return bool(re.search(r"Timeout\s*\(?>?\s*[\d.]+s\)?\s*(?:from pytest-timeout)?|Timeout >\s*[\d.]+s", text))
