@@ -111,6 +111,34 @@ def test_disabled_writes_nothing(pytester: pytest.Pytester):
     assert not (pytester.path / "reporting-labs").exists()
 
 
+def test_flaky_setup_is_not_recorded_as_passed(pytester: pytest.Pytester):
+    """A fixture that fails on the first try and passes on a rerun must not be reported as a clean pass:
+    the rerun report (when=setup, outcome='rerun') has to be captured as a failed attempt."""
+    pytest.importorskip("pytest_rerunfailures")
+    pytester.makepyfile(
+        test_r="""
+        import pytest
+
+        _tries = {"n": 0}
+
+        @pytest.fixture
+        def flaky_setup():
+            _tries["n"] += 1
+            if _tries["n"] == 1:
+                raise RuntimeError("fixture not ready yet")
+            yield
+
+        def test_it(flaky_setup):
+            assert True
+        """
+    )
+    _run(pytester, "-p", "no:cacheprovider", "--reruns", "1")
+    t = next(t for t in _report(pytester)["tests"] if t["title"] == "test_it")
+    # the final outcome is a pass that followed a failure -> flaky, never a plain "passed"
+    assert t["outcome"] == "flaky"
+    assert any(r["status"] == "failed" for r in t["results"])
+
+
 def test_timeout_and_xpass_outcomes(pytester: pytest.Pytester):
     pytester.makepyfile(
         test_t="""

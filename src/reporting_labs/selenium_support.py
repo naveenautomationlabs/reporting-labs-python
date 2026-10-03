@@ -16,6 +16,7 @@ from .core.model import Attempt, now_ms
 _installed = False
 _local = threading.local()
 _drivers_seen: List[str] = []
+_original_execute: Any = None  # WebDriver.execute before patching, so install() can be undone
 
 # command name -> how it reads in the report; commands not listed are not steps (reads like getText, getAttribute).
 STEP_COMMANDS: Dict[str, str] = {
@@ -134,7 +135,7 @@ def _remember_driver(attempt: Attempt, driver: Any) -> None:
 
 
 def install(opts: Any = None) -> bool:
-    global _installed
+    global _installed, _original_execute
     if _installed:
         return True
     try:
@@ -142,6 +143,7 @@ def install(opts: Any = None) -> bool:
     except ImportError:
         return False
     original = WebDriver.execute
+    _original_execute = original
 
     def execute(self: Any, driver_command: str, params: Optional[Dict[str, Any]] = None) -> Any:
         attempt = context.current()
@@ -171,6 +173,20 @@ def install(opts: Any = None) -> bool:
     WebDriver.execute = execute  # type: ignore[assignment]
     _installed = True
     return True
+
+
+def uninstall() -> None:
+    """Restore WebDriver.execute. Used at the end of a run so a long-lived interpreter is left unpatched."""
+    global _installed, _original_execute
+    if _original_execute is not None:
+        try:
+            from selenium.webdriver.remote.webdriver import WebDriver
+            WebDriver.execute = _original_execute  # type: ignore[assignment]
+        except Exception:
+            pass
+    _original_execute = None
+    _drivers_seen.clear()
+    _installed = False
 
 
 def _remember_elements(driver: Any, command: str, params: Dict[str, Any], result: Any) -> None:

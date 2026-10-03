@@ -147,7 +147,7 @@ class Run:
             "history": hist_entries,
             "bdd": bool(bdd),
             "rootDir": str(opts.base),
-            "env": envdetect.collect_env(opts.base, self.framework_rows, {str(k): self.masker.mask_str(str(v)) for k, v in (opts.get("env") or {}).items()}, metadata, self.workers, self.env),
+            "env": self._mask_env_rows(envdetect.collect_env(opts.base, self.framework_rows, {str(k): self.masker.mask_str(str(v)) for k, v in (opts.get("env") or {}).items()}, metadata, self.workers, self.env)),
             "runStatus": run_status,
             "globalErrors": [self._error(e) for e in self.global_errors],
             "globalOutput": [{"stream": o["stream"], "text": self.masker.mask_str(o["text"])} for o in self.global_output],
@@ -265,10 +265,23 @@ class Run:
             d["status"] = s.status
         return d
 
+    def _mask_env_rows(self, rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        # Commit subject, author and branch come from git and can carry secrets; the key is a fixed label.
+        out: List[Dict[str, str]] = []
+        for row in rows:
+            r = dict(row)
+            if "v" in r:
+                r["v"] = self.masker.mask_str(str(r["v"]))
+            out.append(r)
+        return out
+
     def _error(self, e: ErrorInfo) -> Dict[str, Any]:
         m = self.masker
         d: Dict[str, Any] = {"message": m.mask_str(ANSI.sub("", e.message or ""))}
-        why = explain_mod.explain(d["message"], e.exc_type)
+        try:
+            why = explain_mod.explain(d["message"], e.exc_type)
+        except Exception:
+            why = None  # the human-readable hint is a nicety; a bug in it must never drop the error
         if why:
             d["explain"] = why
         if e.stack:
@@ -323,7 +336,7 @@ class Run:
 
     def _attachment(self, a: Attachment, t: TestRecord, assets: Path) -> Optional[Dict[str, Any]]:
         opts = self.options
-        out: Dict[str, Any] = {"name": a.name, "contentType": a.content_type}
+        out: Dict[str, Any] = {"name": self.masker.mask_str(a.name), "contentType": a.content_type}
         embed = opts.get("embedAttachments") is not False
         limit = int(opts.get("embedLimit") or 2 * 1024 * 1024)
         ct = a.content_type or ""

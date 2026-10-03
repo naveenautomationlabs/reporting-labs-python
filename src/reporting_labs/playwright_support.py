@@ -39,6 +39,7 @@ _SECRET_FIELD = ("password", "passwd", "pwd", "pass", "pw", "secret", "token", "
 _installed = False
 _depth: contextvars.ContextVar[int] = contextvars.ContextVar("rl_pw_depth", default=0)
 _browsers_seen: List[str] = []
+_patched: List[tuple] = []  # (cls, method_name, original) so install() can be undone
 
 
 def _short(v: Any) -> str:
@@ -170,6 +171,7 @@ def _wrap(cls: type, method: str, category: str) -> None:
             return result
         aw._rl_wrapped = True  # type: ignore[attr-defined]
         setattr(cls, method, aw)
+        _patched.append((cls, method, original))
     else:
         @functools.wraps(original)
         def w(self: Any, *args: Any, **kwargs: Any) -> Any:
@@ -185,6 +187,7 @@ def _wrap(cls: type, method: str, category: str) -> None:
             return result
         w._rl_wrapped = True  # type: ignore[attr-defined]
         setattr(cls, method, w)
+        _patched.append((cls, method, original))
 
 
 def _wrap_assertions(cls: type) -> None:
@@ -253,6 +256,7 @@ def _wrap_assertions(cls: type) -> None:
             return w
 
         setattr(cls, name, make(name, original))
+        _patched.append((cls, name, original))
 
 
 def _wrap_api(cls: type) -> None:
@@ -322,6 +326,7 @@ def _wrap_api(cls: type) -> None:
             return w
 
         setattr(cls, method, make(method, original))
+        _patched.append((cls, method, original))
 
 
 def _install_module(mod: Any) -> None:
@@ -362,6 +367,20 @@ def install(opts: Any = None) -> bool:
     _install_module(async_mod)
     _installed = True
     return True
+
+
+def uninstall() -> None:
+    """Restore the original Playwright methods. Used at the end of a run so an in-process import of the
+    library (e.g. a test runner that keeps the interpreter alive) is left unpatched."""
+    global _installed
+    for cls, method, original in reversed(_patched):
+        try:
+            setattr(cls, method, original)
+        except Exception:
+            pass
+    _patched.clear()
+    _browsers_seen.clear()
+    _installed = False
 
 
 def live_pages(attempt: Attempt) -> List[Any]:

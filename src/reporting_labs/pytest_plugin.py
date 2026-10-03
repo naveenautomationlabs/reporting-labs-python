@@ -84,11 +84,12 @@ def _install_tools(opts: options_mod.Options) -> None:
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:
-    try:
-        from .capture import http
-        http.uninstall()
-    except Exception:
-        pass
+    for mod_name in ("capture.http", "playwright_support", "selenium_support"):
+        try:
+            import importlib
+            importlib.import_module(f".{mod_name}", __package__).uninstall()
+        except Exception:
+            pass
 
 
 # ── runs where the tests run (every process) ──────────────────────────────────────────────────────
@@ -114,6 +115,12 @@ class Runtime:
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo):
         outcome = yield
+        try:
+            self._makereport(item, call, outcome)
+        except Exception:
+            pass  # a bug in the reporter must never fail the user's test
+
+    def _makereport(self, item: pytest.Item, call: pytest.CallInfo, outcome: Any) -> None:
         attempt: Optional[Attempt] = getattr(item, "_rl_attempt", None)
         if attempt is None:
             return
@@ -319,7 +326,10 @@ class Controller:
             attempt._rl_skipped = previous._rl_skipped  # type: ignore[attr-defined]
         status: str = attempt._rl_status  # type: ignore[attr-defined]
         if report.when == "setup":
-            if report.failed:
+            if report.outcome == "rerun":
+                status = "failed"  # a retried fixture failure, else the first attempt would record as passed
+                attempt._rl_rerun = True  # type: ignore[attr-defined]
+            elif report.failed:
                 status = "failed"
             elif report.skipped:
                 attempt._rl_skipped = _skip_reason(report)  # type: ignore[attr-defined]
