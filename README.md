@@ -1,1 +1,127 @@
 # reportingLabs for Python
+
+**One beautiful HTML report for pytest, Playwright, Selenium and Robot Framework.** It tells you what broke,
+who owns it, and whether it is new. The whole report is a single self-contained HTML file: no server, no
+upload, no login. Open it in a browser, attach it to a CI job, or drop it in Slack.
+
+The report is byte-for-byte the same layout as the [Node.js](https://github.com/naveenautomationlabs/reporting-labs)
+and [Java](https://github.com/naveenautomationlabs/reporting-labs-java) reporters, so one triage habit works
+across a whole company. Nothing from Node is needed at run time: the report is built entirely in Python.
+
+## Install
+
+```bash
+pip install reporting-labs
+```
+
+That is all. The pytest plugin turns on the moment the package is installed. For Robot Framework, add one
+listener flag (below).
+
+## pytest
+
+Run your tests as you always do:
+
+```bash
+pytest
+open reporting-labs/index.html        # run again to see the trend and flaky history
+```
+
+Add detail with a few optional helpers:
+
+```python
+import pytest
+from reporting_labs import meta, log, test_data, step, api, attach
+
+@pytest.mark.meta(priority="P1", owner="asha", feature="checkout", story="SHOP-231")
+def test_checkout(page):
+    test_data({"username": "demo", "password": "S3cret"}, "Login")   # sensitive keys are masked
+    log("cart total before coupons: 99.00")
+    with step("Apply coupon"):
+        ...
+```
+
+| What you get | How |
+|---|---|
+| A row per test: passed, failed, skipped (with the reason), xfail / xpass | automatic |
+| Flaky, with every attempt | `pytest-rerunfailures` |
+| Timed out | `pytest-timeout` |
+| Parallel runs merged into one report | `pytest-xdist` (`-n auto`) |
+| Priority, owner, feature charts and filters | `@pytest.mark.meta(...)` or `meta(...)` |
+| Every `requests` / `httpx` call in the API tab | automatic |
+| Captured stdout / stderr, with secrets masked | automatic |
+
+Turn it off for a run with `-p no:reporting_labs` or `--no-rl`.
+
+## Playwright
+
+Install `pytest-playwright` and write tests as usual. Every action, every `expect()` and a screenshot of the
+failing page land in the report with no extra code. pytest-playwright's trace and video are attached too:
+
+```bash
+pytest --tracing retain-on-failure --video retain-on-failure
+```
+
+The sync and async APIs both work. See `examples/pytest-playwright`.
+
+## Selenium
+
+Install `selenium` and write tests as usual. Every driver command (open, find, click, type, run script,
+perform actions, Appium taps) becomes a step, with the element named by the locator that found it, and a
+screenshot of the browser is attached when a test fails. No wrappers. See `examples/pytest-selenium`.
+
+## Robot Framework
+
+Add one listener flag:
+
+```bash
+robot --listener reporting_labs.RobotListener tests/
+```
+
+One row per test case, suites as the path, every keyword a step, setup and teardown as hooks, tags as
+filters, and the screenshots SeleniumLibrary or the Browser library embed in the log attached to the test.
+Options go after a colon: `--listener reporting_labs.RobotListener:title=Checkout:output=reports/rl`.
+See `examples/robot-selenium`.
+
+## Configuration
+
+Every option is optional. Put them in `reporting-labs.config.json` next to where you run, or under
+`[tool.reporting-labs]` in `pyproject.toml`. Keys may be written `camelCase` (as in the Node reporter) or
+`snake_case`.
+
+```json
+{
+  "title": "Checkout regression",
+  "project": { "name": "ShopLite", "version": "2.4.0", "team": "QA Platform" },
+  "metadata": { "env": "local" },
+  "logo": "logo.png",
+  "palette": "lab",
+  "links": { "story": "https://acme.atlassian.net/browse/{id}" },
+  "maskKeys": ["otp", "pan"],
+  "history": { "enabled": true, "keep": 30 }
+}
+```
+
+Common options: `title`, `logo`, `accent`, `theme` (`auto` / `light` / `dark`), `palette`
+(`lab` / `ocean` / `ember` / `mono`), `outputFolder`, `metadata`, `project`, `env`, `dimensions`,
+`links`, `maskKeys`, `maskValues`, `maskFromEnv`, `history`, `open` (`on-failure` / `always` / `never`).
+
+**The environment chip** is found for you from `ENV`, `TEST_ENV`, `APP_ENV`, `TARGET_ENV`,
+`CI_ENVIRONMENT_NAME`, or any variable ending in `_ENV`, so a config that says `local` still labels the
+pipeline's reports `dev`, `qa`, `stage`. Point it at your own variable with `"envVar": "TARGET"`.
+
+**Runtime overrides**, read from the environment and winning over the config, so CI can label a run without
+touching the file: `REPORTING_LABS_METADATA_<KEY>` sets a header chip
+(`REPORTING_LABS_METADATA_ENV=qa`), and `REPORTING_LABS_TITLE`, `_THEME`, `_PALETTE`, `_ACCENT`, `_LOGO`
+set the matching option.
+
+## Secrets are masked
+
+Passwords, tokens, cookies, auth headers, API keys (Stripe, GitHub, AWS, Google, GitLab, npm, SendGrid),
+JWTs and Luhn-valid card numbers are blanked in logs, request and response bodies, error messages, test
+data and step titles. A value seen once as a secret (`password=...`, a `PASSWORD` env var, or `maskValues`)
+is blanked everywhere it later appears. `maskKeys` adds your own keys; `maskFromEnv` (on by default) learns
+the values of `PASSWORD` / `*_TOKEN` / `*_SECRET` environment variables.
+
+## License
+
+MIT. The report is a file you own; nothing leaves your machine or your CI.

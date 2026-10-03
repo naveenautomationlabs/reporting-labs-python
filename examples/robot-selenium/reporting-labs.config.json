@@ -1,0 +1,5 @@
+{
+  "title": "Demo Shop - Robot Framework",
+  "project": { "name": "Demo Shop", "team": "QA Platform" },
+  "metadata": { "env": "local" }
+}

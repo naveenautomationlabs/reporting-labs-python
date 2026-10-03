@@ -1,0 +1,4 @@
+reporting-labs
+pytest
+playwright
+pytest-playwright

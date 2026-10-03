@@ -1,0 +1,6 @@
+{
+  "title": "Demo Shop - Playwright",
+  "project": { "name": "Demo Shop", "version": "2.4.0", "team": "QA Platform" },
+  "metadata": { "env": "local" },
+  "links": { "story": "https://example.atlassian.net/browse/{id}" }
+}
