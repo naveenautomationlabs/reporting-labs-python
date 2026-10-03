@@ -647,6 +647,104 @@ html,body{font-size:var(--fs)}
 .nav .cnt,.chip,.step .cat,.folder,.item .d,.dim .k,.wk .n,.wk-sum,.attn2 .pr,.clu2 .n small,.flk .m,.own .cnts,.ediff .lbl,.ttip .tt-h span,.tags button,.hint-kbd,.trace-how,.api-col h5,.meta .k,.kv.env dt,.apitbl th,.hm thead th,.hm td button{font-family:var(--sans)}
 .chip b,.loc,.file,.file-row,.kbd,.slow .d,.step .d,.hist .l,.wk .k,.tbl td,.kv2 dd,.kv.env dd,.logs,.txt,.err,.ediff .val,.ediff.lines,.clu2 .msg,.apitbl .u,.api-head .m,.api-head .sc,.api-head .d,.api-col pre,.badge.tag,.trend text,.tl text,.attn2 .tt .s .mono,.trace-how code{font-family:var(--mono)}
 .chip{font-family:var(--sans)} .chip b{font-weight:500}
+
+/* ---------- report footer: reportingLabs branding ---------- */
+.rl-foot{max-width:1400px;margin:30px auto 0;padding:18px 28px 30px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;color:var(--ink-3);font-size:12.5px}
+.rl-foot-mark{width:22px;height:22px;display:inline-flex;flex:none}
+.rl-foot-mark svg{width:22px;height:22px;display:block;border-radius:6px}
+.rl-foot-txt b{color:var(--ink-2);font-weight:600}
+@media print{ .rl-foot{display:none} }
+
+/* ---------- print / PDF: a clean, client-shareable executive report ----------
+   Page 1 is a full executive summary (no wasted space); analytics, failure analysis, the
+   full test-case table and failure evidence each start on a fresh page. Per-test steps,
+   logs, API and console are left out so the PDF stays small and readable at 500+ tests. */
+.printdoc{display:none}
+@media print{
+  @page{ size:A4; margin:12mm 11mm 13mm; }
+  html,body{background:#fff!important}
+  #app{display:none!important}
+  .printdoc{display:block!important;max-width:none;margin:0;padding:0;color:var(--ink);font-size:12px}
+  .printdoc *{ -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
+  /* On paper nothing can be clicked or hovered, so never truncate text with an ellipsis or a
+     height clamp — wrap it and show it in full. Numbers, durations and status chips stay on one line. */
+  .printdoc .apitbl .u,.printdoc .apitbl .t,.printdoc .apitbl td,.printdoc .slow .t,.printdoc .proj .name,
+  .printdoc .file,.printdoc .item .tt .p,.printdoc .item .tt .n,.printdoc .item .d,.printdoc .step .t,
+  .printdoc .att figcaption,.printdoc .dim .k,.printdoc .attn .t,.printdoc .attn .t .tt,.printdoc .attn .sev,
+  .printdoc .attn2 .pr,.printdoc .attn2 .ow,.printdoc .attn2 .tt .n,.printdoc .attn2 .tt .s,
+  .printdoc .tbl td,.printdoc .tbl th,.printdoc .api-head .u,.printdoc .clu .msg,.printdoc .clu .n,
+  .printdoc .clu2 .msg,.printdoc .clu2 .who,.printdoc .clu2 .who button,.printdoc .own .ts,.printdoc .own .nm,
+  .printdoc .hist .b .l,.printdoc .loc,.printdoc .crumb span,.printdoc .pt-name,.printdoc .pt-sub,.printdoc .pt-spec{
+    white-space:normal!important;overflow:visible!important;text-overflow:clip!important;
+    max-width:none!important;max-height:none!important;overflow-wrap:break-word;-webkit-line-clamp:none!important;
+  }
+  /* durations / counts / status stay on one line so "9ms" never breaks to "9m s" */
+  .printdoc .apitbl td.t:last-child,.printdoc .num,.printdoc .pstatus,.printdoc .since-txt{white-space:nowrap!important;overflow-wrap:normal!important}
+  /* only genuinely unbreakable strings (urls, file paths, selectors) may break mid-token */
+  .printdoc .apitbl .u,.printdoc .api-head .u,.printdoc .pt-spec,.printdoc .loc,.printdoc .file,.printdoc .clu .msg,.printdoc .clu2 .msg{overflow-wrap:anywhere}
+  /* Content flows continuously — no forced page breaks between sections, which were leaving
+     whole pages nearly empty. Cards/rows just avoid being split across a page. */
+  .printdoc .psec{padding-top:0;margin-top:18px}
+  .printdoc .psec-h{font-size:16px;font-weight:600;letter-spacing:-.01em;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line);color:var(--ink);break-after:avoid}
+  /* Only small, atomic blocks avoid a page split. Big cards (clusters, needs-attention, the tables)
+     may flow across pages — keeping them whole is what left pages half-empty. */
+  .printdoc .gchart,.printdoc figure,.printdoc .kpi,.printdoc .hm,.printdoc .pev,.printdoc .pexec-card,.printdoc tr{break-inside:avoid}
+  .printdoc h4{break-after:avoid}
+  /* CSS grid does not fragment across print pages, so a tall two-column grid jumps to the next page
+     and leaves a gap. In print everything becomes a single full-width column that flows naturally. */
+  .printdoc .grid{display:block!important;margin:0}
+  .printdoc .grid>*{grid-column:auto!important;width:auto!important;max-width:none!important;margin:0 0 12px!important;break-inside:avoid}
+  .printdoc .grid>.card.w12,.printdoc .grid>.fail-rail,.printdoc .grid>.fx-tools{break-inside:auto}
+  .printdoc .graphs-grid>*{break-inside:avoid}
+  .printdoc .list,.printdoc .nav,.printdoc .band,.printdoc .stripe,.printdoc .fx-tools .btn,.printdoc .fx-tools .spacer{display:none!important}
+  /* drop interactive-only chrome and anything that cannot live on paper */
+  .printdoc .actions,.printdoc .gchart-head button,.printdoc .vids,.printdoc .cmp,.printdoc .hint-kbd,.printdoc .mask-note,.printdoc .clu2 .who .ex{display:none!important}
+  .printdoc a{color:var(--ink);text-decoration:none}
+  /* ---- cover / executive summary (page 1) ---- */
+  .printdoc .pcover{padding:2mm 0 0}
+  .printdoc .pcover-top{display:flex;align-items:center;gap:13px}
+  .printdoc .pcover .logo{width:44px;height:44px;flex:none}
+  .printdoc .pcover .logo svg{width:44px;height:44px;display:block;border-radius:11px}
+  .printdoc .pcover-title{font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+  .printdoc .pcover-sub{color:var(--ink-3);font-size:12px;margin-top:3px}
+  .printdoc .pcover-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .printdoc .pverdict{font-size:17px;font-weight:600;margin:16px 0 2px}
+  .printdoc .pverdict.ok{color:var(--pass)} .printdoc .pverdict.bad{color:var(--fail)}
+  .printdoc .pcover-stats{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 4px}
+  .printdoc .pstat{border:1px solid var(--line);border-radius:10px;padding:9px 15px;min-width:84px;background:var(--surface)}
+  .printdoc .pstat .n{font-size:25px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+  .printdoc .pstat .l{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+  .printdoc .pexec{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;align-items:start}
+  .printdoc .pexec-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
+  .printdoc .psub-h{font-size:12.5px;font-weight:600;color:var(--ink);margin:0 0 10px}
+  /* ---- the all-tests table ---- */
+  .printdoc .ptbl{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+  .printdoc .ptbl thead{display:table-header-group}
+  .printdoc .ptbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:600;padding:7px 8px;border-bottom:2px solid var(--line)}
+  .printdoc .ptbl td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+  .printdoc .ptbl td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap}
+  .printdoc .ptbl .pt-name{font-weight:500;color:var(--ink)}
+  .printdoc .ptbl .pt-sub{font-size:10px;color:var(--ink-3);margin-top:1px}
+  .printdoc .ptbl .pt-spec{font:10.5px var(--mono);color:var(--ink-2)}
+  .printdoc .pstatus{display:inline-flex;align-items:center;gap:6px;font-weight:500;white-space:nowrap}
+  .printdoc .pstatus .st{width:9px;height:9px;border-radius:50%;flex:none}
+  .printdoc .ptbl .c-n{width:30px} .printdoc .ptbl .c-pri{width:72px} .printdoc .ptbl .c-own{width:84px} .printdoc .ptbl .c-st{width:88px} .printdoc .ptbl .c-dur{width:62px}
+  /* ---- failure evidence ---- */
+  .printdoc .pev{padding:14px 0;border-top:1px solid var(--line)}
+  .printdoc .pev:first-child{border-top:0;padding-top:2px}
+  .printdoc .pev-head{display:flex;align-items:center;gap:9px}
+  .printdoc .pev-head .st{width:10px;height:10px;border-radius:50%;flex:none}
+  .printdoc .pev-title{font-size:14px;font-weight:600;letter-spacing:-.01em}
+  .printdoc .pev-loc{font:11px var(--mono);color:var(--ink-3);margin:3px 0 8px}
+  .printdoc .pev .why{margin-bottom:8px}
+  .printdoc .pev .att{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+  .printdoc .pev .att figure{flex:1 1 320px;min-width:0;margin:0}
+  .printdoc .pev .att img{width:100%;max-height:115mm;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff}
+  .printdoc .pev .att figcaption{font:11px var(--mono);color:var(--ink-3);padding:5px 7px;background:var(--surface-2);border-radius:0 0 6px 6px;margin-top:-6px}
+  .printdoc .pev .errfull,.printdoc .pev details{display:none!important}
+  .printdoc .pfoot{margin-top:5mm;padding-top:3mm;border-top:1px solid var(--line);font-size:10px;color:var(--ink-3)}
+  .printdoc .err,.printdoc pre{white-space:pre-wrap;word-break:break-word}
+}
 __RL_ACCENT_CSS____RL_CUSTOM_CSS__</style>
 </head>
 <body>
@@ -684,7 +782,8 @@ app.append(h('div',{class:'band'}, stripe(), header(), nav()),
   h('div',{class:'view','data-view':'failures'}, h('div',{class:'view-pad'}, failuresView())),
   h('div',{class:'view','data-view':'api'}, h('div',{class:'view-pad'}, apiView())),
   h('div',{class:'view','data-view':'graphs'}, graphsView()),
-  hasTimelineView()? h('div',{class:'view','data-view':'timeline'}, h('div',{class:'view-pad'}, timelineView())) : null);
+  hasTimelineView()? h('div',{class:'view','data-view':'timeline'}, h('div',{class:'view-pad'}, timelineView())) : null,
+  rlFooter());
 select(state.selected || firstInteresting(), true);
 showView(state.view);
 window.addEventListener('keydown', e=>{
@@ -979,6 +1078,7 @@ function header(){
   const pal = h('select',{class:'pal','aria-label':'Palette',onchange:e=>{ html.setAttribute('data-palette',e.target.value); try{localStorage.setItem('rl-palette',e.target.value);}catch(e){} }},
     [['lab','Blue'],['ocean','Ocean'],['ember','Ember'],['mono','Mono']].map(([v,l])=>h('option',{value:v,selected:html.getAttribute('data-palette')===v},l)));
   const copy = h('button',{class:'btn',onclick:e=>copyText(summaryMarkdown(),e.currentTarget,'Copied for Slack')}, 'Copy summary');
+  const pdf = h('button',{class:'btn',title:'Save the whole report as a PDF — every section, chart, cluster and screenshot, print-friendly',onclick:()=>exportPdf()}, 'Export PDF');
   return h('header',{class:'hdr'},
     data.options.logo ? h('img',{class:'logo brand',src:data.options.logo,alt:''}) : h('div',{class:'logo',title:'Generated by reportingLabs','aria-label':'reportingLabs'}, document.getElementById('rl-logo').content.cloneNode(true)),
     data.options.project ? h('div',{class:'proj-blk'}, h('h1',{}, data.title),
@@ -989,7 +1089,17 @@ function header(){
     h('div',{class:'hmeta'}, Object.entries(data.metadata).map(([k,v])=>h('span',{class:'chip'}, k+' ', h('b',{},v)))),
     h('div',{class:'spacer'}),
     h('span',{class:'when'}, new Date(data.startTime).toLocaleString()+' · '+ms(data.duration)+' · '+data.workers+' worker'+(data.workers===1?'':'s')),
-    h('div',{class:'ctl'}, copy, pal, toggle));
+    h('div',{class:'ctl'}, copy, pdf, pal, toggle));
+}
+
+/* ---------- footer: reportingLabs branding ---------- */
+function rlFooter(){
+  const src=document.getElementById('rl-logo').content.cloneNode(true).querySelector('svg');
+  const svg=src.outerHTML.replace(/(id="|url\(#|href="#)(rl-[a-z]+)/g,'$1$2-f');  // unique ids vs the header's copy
+  return h('footer',{class:'rl-foot'},
+    h('span',{class:'rl-foot-mark',html:svg}),
+    h('span',{class:'rl-foot-txt'}, 'Generated by ', h('b',{},'reportingLabs'),
+      data.generatedAt? ' · '+new Date(data.generatedAt).toLocaleString() : null));
 }
 
 /* ---------- summary ---------- */
@@ -1514,8 +1624,9 @@ function select(id, quiet){
   state.selected=id; state.retry=t.results.length-1; if(!quiet){ if(state.view!=='tests') showView('tests'); else setHash(); } refresh(); renderDetail(t);
   const it=document.querySelector('.item[data-id="'+id+'"]'); if(it&&it.scrollIntoView) it.scrollIntoView({block:'nearest'});
 }
-function renderDetail(t){
-  const d=$('#detail'); d.innerHTML='';
+function renderDetail(t, d, retryIdx){
+  d=d||$('#detail'); d.innerHTML='';
+  const retry = retryIdx==null ? state.retry : retryIdx;
   d.append(h('div',{class:'crumb'}, [t.file, ...t.path.map(p=>data.bdd&&!/^Feature:/i.test(p)?'Feature: '+p:p)].map(p=>h('span',{},p))),
     h('div',{class:'titlebar'}, h('h3',{},t.title), h('div',{class:'actions'},
       h('button',{class:'btn',onclick:e=>copyText(location.href.split('#')[0]+'#t='+t.id,e.currentTarget,'Link copied')},'Copy link'),
@@ -1528,11 +1639,11 @@ function renderDetail(t){
   const otherAnn=t.annotations.filter(a=>!DIMS.includes(a.type.toLowerCase()) && !(a.type.toLowerCase() in t.meta));
   if(otherAnn.length) d.append(h('h4',{},'Annotations'), h('dl',{class:'kv'}, otherAnn.map(a=>[h('dt',{},a.type),h('dd',{},a.description||'')])));
   if(t.results.length>1){
-    d.append(h('div',{class:'tabs'}, t.results.map((r,i)=>h('button',{class:'tab','aria-selected':state.retry===i,onclick:()=>{state.retry=i;renderDetail(t);}}, (i===0?'Attempt 1':'Retry '+i)+' · '+(label[r.status]||r.status)))));
+    d.append(h('div',{class:'tabs'}, t.results.map((r,i)=>h('button',{class:'tab','aria-selected':retry===i,onclick:()=>{state.retry=i;renderDetail(t);}}, (i===0?'Attempt 1':'Retry '+i)+' · '+(label[r.status]||r.status)))));
   }
-  const r=t.results[state.retry]; if(!r){ d.append(h('p',{class:'empty'},'This test did not run.')); return; }
+  const r=t.results[retry]; if(!r){ d.append(h('p',{class:'empty'},'This test did not run.')); return; }
   const body=h('div',{});
-  if(t.note&&state.retry===t.results.length-1) body.append(h('div',{class:'note '+(t.outcome==='passed'?'ok':'warn')}, t.note));
+  if(t.note&&retry===t.results.length-1) body.append(h('div',{class:'note '+(t.outcome==='passed'?'ok':'warn')}, t.note));
   if(r.errors.length){ body.append(h('h4',{},r.errors.length>1?'Errors':'Error'), ...r.errors.map(errorView)); }
   if(r.steps.length){ const stepTotal=Math.max(1, r.duration||0, r.steps.reduce((a,x)=>a+x.duration,0)); body.append(h('h4',{},data.bdd?'Scenario steps':'Steps', h('span',{class:'hint'},'bar = share of '+ms(stepTotal))), stepTree(r.steps, stepTotal)); }
   if(r.logs.length){ const t0=r.startTime; body.append(h('h4',{},'Log'), h('div',{class:'logs'}, r.logs.map(l=>h('div',{class:'ln'+(/\b(error|fail|exception)\b/i.test(l.msg)?' err':/\bwarn/i.test(l.msg)?' warn':'')}, h('span',{class:'ts'},'+'+ms(Math.max(0,l.t-t0))), h('span',{class:'lm'},l.msg))))); }
@@ -1688,6 +1799,125 @@ function openBugReport(t){
 }
 function lightbox(src){ const lb=h('div',{class:'lb',onclick:()=>lb.remove()}, h('img',{src})); document.body.append(lb); }
 function escape(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------- print / PDF ----------
+   One builder serves both the "Export PDF" button (window.print) and headless page.pdf():
+   Chromium fires 'beforeprint' for both. We assemble the whole report — cover, overview,
+   failures, graphs, API and every test's detail expanded — into a .printdoc, force the light
+   theme for paper, print, then tear it all down so the live app is untouched. Video is skipped. */
+function buildPrintDoc(){
+  if(document.querySelector('.printdoc')) return;
+  const html=document.documentElement;
+  html.setAttribute('data-rl-theme-prev', html.getAttribute('data-theme')||'');
+  html.setAttribute('data-theme','light');   // always light on paper, whatever the screen theme
+  const pd=h('div',{class:'printdoc'});
+  const s=data.stats, f=s.failed+s.timedOut+s.interrupted, ran=s.total-s.skipped, rate=ran?Math.round(s.passed/ran*100):0;
+  const stat=(n,l,c)=>h('div',{class:'pstat'}, h('div',{class:'n',style:c?'color:'+c:''},String(n)), h('div',{class:'l'},l));
+  let logo;
+  if(data.options.logo){ logo = h('img',{src:data.options.logo,alt:'',style:'width:40px;height:40px;border-radius:8px'}); }
+  else {
+    // The live header already holds one copy of this SVG; in print that copy is display:none, and its
+    // gradient/clip ids would win over an identical clone (first id in the document). Rewrite the ids so
+    // the cover's logo paints its gradients and flask clip correctly.
+    const src=document.getElementById('rl-logo').content.cloneNode(true).querySelector('svg');
+    const html2=src.outerHTML.replace(/(id="|url\(#|href="#)(rl-[a-z]+)/g,'$1$2-p');
+    const holder=h('span',{class:'logo',style:'display:inline-flex;width:40px;height:40px',html:html2});
+    logo=holder;
+  }
+  const verdict = f ? (f+' of '+s.total+' test'+(s.total===1?'':'s')+' failed'+(s.flaky?', '+s.flaky+' flaky':''))
+    : (ran===0 ? 'No tests ran' : 'All '+ran+' test'+(ran===1?'':'s')+' passed'+(s.flaky?', '+s.flaky+' flaky':'')+(s.skipped?' · '+s.skipped+' skipped':''));
+  // ---- page 1: executive summary ----
+  pd.append(h('div',{class:'pcover'},
+    h('div',{class:'pcover-top'}, logo,
+      h('div',{}, h('div',{class:'pcover-title'}, data.title),
+        h('div',{class:'pcover-sub'}, (data.options.project?[data.options.project.name, data.options.project.version?'v'+data.options.project.version:null, data.options.project.team].filter(Boolean).join(' · ')+' · ':'')
+          + new Date(data.startTime).toLocaleString()+' · '+ms(data.duration)+' · '+data.workers+' worker'+(data.workers===1?'':'s')))),
+    Object.keys(data.metadata).length? h('div',{class:'pcover-meta'}, Object.entries(data.metadata).map(([k,v])=>h('span',{class:'chip'}, k+' ', h('b',{},v)))) : null,
+    h('div',{class:'pverdict '+(f?'bad':'ok')}, verdict),
+    h('div',{class:'pcover-stats'},
+      stat(rate+'%','Pass rate'), stat(s.passed,'Passed','var(--pass)'),
+      f?stat(f,'Failed','var(--fail)'):null, s.flaky?stat(s.flaky,'Flaky','var(--flaky)'):null,
+      s.skipped?stat(s.skipped,'Skipped','var(--ink-3)'):null, stat(s.total,'Total'))));
+  const pexec=h('div',{class:'pexec'});
+  pexec.append(h('div',{class:'pexec-card'}, h('div',{class:'psub-h'},'Pass rate'), donut()));
+  const envc=printEnvCard(); if(envc) pexec.append(envc);
+  pd.append(pexec);
+
+  // The first section flows right after the executive summary so page 1 is never half-empty;
+  // the rest start on a fresh page.
+  let first=true;
+  const sec=(title,node)=>{ if(!node) return; pd.append(h('section',{class:'psec'+(first?'':' brk')}, h('h2',{class:'psec-h'},title), node)); first=false; };
+  // ---- analytics, failure analysis, full inventory, evidence ----
+  if(data.tests.length) sec('Test analytics', graphsView());
+  if(f + s.flaky > 0){
+    const fn=failuresView();
+    // On paper there is no "+N more" to click, so expand every cluster to list all its tests.
+    fn.querySelectorAll('.clu2 .who .ex').forEach(b=>{ try{ b.click(); }catch(e){} });
+    sec('Failure analysis', fn);
+  }
+  sec('All test cases', allTestsTable());
+  const bad=[...data.tests].filter(t=>isFail(t.outcome)||t.outcome==='flaky').sort((a,b)=>rank(a)-rank(b)||a.title.localeCompare(b.title));
+  if(bad.length){ const ev=h('div',{}); for(const t of bad) ev.append(printEvidence(t)); sec('Failure evidence', ev); }
+  pd.append(h('div',{class:'pfoot'}, 'Generated by reportingLabs · '+new Date().toLocaleString()));
+  document.body.append(pd);
+}
+function printEnvCard(){
+  if(!data.env||!data.env.length) return null;
+  return h('div',{class:'pexec-card'}, h('div',{class:'psub-h'},'Environment'),
+    h('dl',{class:'kv env'}, data.env.flatMap(r=>[h('dt',{},r.k), h('dd',{}, r.href? h('a',{href:r.href},r.v) : r.v)])));
+}
+function allTestsTable(){
+  const hasPri=data.tests.some(t=>t.meta.priority||t.meta.severity), hasOwn=data.tests.some(t=>t.meta.owner), multiProj=data.projects.length>1;
+  const cols=[['c-n','#'],['','Test'],['','Spec'], hasPri?['c-pri','Priority']:null, hasOwn?['c-own','Owner']:null, ['c-st','Status'], ['c-dur','Duration']].filter(Boolean);
+  const order=[...data.tests].sort((a,b)=>((isFail(b.outcome)||b.outcome==='flaky')-(isFail(a.outcome)||a.outcome==='flaky'))||rank(a)-rank(b)||a.file.localeCompare(b.file)||a.title.localeCompare(b.title));
+  let i=0;
+  return h('table',{class:'ptbl'},
+    h('colgroup',{}, cols.map(([c])=>h('col',{class:c||''}))),
+    h('thead',{}, h('tr',{}, cols.map(([,l])=>h('th',{},l)))),
+    h('tbody',{}, order.map(t=>{ i++; return h('tr',{}, [
+      h('td',{class:'num'}, String(i)),
+      h('td',{}, h('div',{class:'pt-name'}, t.title), t.path.length? h('div',{class:'pt-sub'}, t.path.join(' › ')) : null),
+      h('td',{}, h('span',{class:'pt-spec'}, t.file.split('/').pop()+(multiProj?' · '+t.project:''))),
+      hasPri? h('td',{}, [t.meta.priority,t.meta.severity].filter(Boolean).join(' · ')) : null,
+      hasOwn? h('td',{}, t.meta.owner||'') : null,
+      h('td',{}, h('span',{class:'pstatus'}, h('span',{class:'st '+t.outcome,style:'background:'+colorOf(bucket(t))}), label[t.outcome])),
+      h('td',{class:'num'}, ms(t.duration)),
+    ].filter(x=>x!==null)); })));
+}
+function printEvidence(t){
+  const r=t.results[t.results.length-1], e=r&&r.errors[0];
+  const art=h('article',{class:'pev'});
+  art.append(h('div',{class:'pev-head'}, h('span',{class:'st',style:'background:'+colorOf(bucket(t))}), h('span',{class:'pev-title'}, t.title), h('span',{class:'badge '+t.outcome}, label[t.outcome])));
+  art.append(h('div',{class:'pev-loc'}, t.file+':'+t.line+(data.projects.length>1?' · '+t.project:'')+' · '+ms(t.duration)+(t.results.length>1?' · '+t.results.length+' attempts':'')+(t.meta.owner?' · '+t.meta.owner:'')+(t.meta.priority?' · '+t.meta.priority:'')));
+  if(e){ if(e.explain) art.append(whyView(e.explain)); art.append(errorBody(e)); }
+  else art.append(h('div',{style:'color:var(--ink-3)'}, t.outcome==='flaky'?'Passed on retry after an earlier failure.':'No error message was recorded.'));
+  const imgs=(r?r.attachments:[]).filter(a=>a.src&&(a.contentType||'').startsWith('image/')&&!/-(expected|actual|diff)(\.\w+)?$/.test(a.name));
+  if(imgs.length) art.append(h('div',{class:'att'}, imgs.slice(0,2).map(a=>h('figure',{}, h('img',{src:a.src,alt:a.name}), h('figcaption',{},a.name)))));
+  return art;
+}
+function teardownPrintDoc(){
+  const pd=document.querySelector('.printdoc'); if(pd) pd.remove();
+  const html=document.documentElement, prev=html.getAttribute('data-rl-theme-prev');
+  if(prev!=null){ if(prev) html.setAttribute('data-theme',prev); else html.removeAttribute('data-theme'); html.removeAttribute('data-rl-theme-prev'); }
+}
+// Build the print document and wait for every screenshot (a data: URI) to actually decode, so it
+// is painted — otherwise a print fired right after the DOM is built captures blank image boxes.
+async function preparePrint(){
+  buildPrintDoc();
+  try{ await Promise.all([...document.querySelectorAll('.printdoc img')].map(im=> im.decode? im.decode().catch(()=>{}) : Promise.resolve())); }catch(e){}
+  return document.querySelectorAll('.printdoc img').length;
+}
+async function exportPdf(){
+  await preparePrint();
+  try{ window.print(); }catch(e){}
+}
+// A headless driver (the reporter's auto-generated report.pdf) awaits this, then calls page.pdf().
+window.reportingLabsPreparePrint = preparePrint;
+// A plain headless Chrome launched with --print-to-pdf on this file with ?rl-print (how the Java/CLI
+// generator renders report.pdf) has no way to call the hook, so build the print document on load instead.
+if(/[?&#]rl-print\b/.test(location.href)){ if(document.readyState!=='loading') preparePrint(); else window.addEventListener('DOMContentLoaded', preparePrint); }
+window.addEventListener('beforeprint', buildPrintDoc);   // native Ctrl+P: build if not already built
+window.addEventListener('afterprint', teardownPrintDoc);
 })();
 </script>
 </body>
