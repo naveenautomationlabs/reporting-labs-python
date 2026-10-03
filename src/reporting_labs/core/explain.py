@@ -66,10 +66,20 @@ def explain(message: str, exc_type: Optional[str] = None) -> Optional[Dict[str, 
     msg = _ANSI.sub("", message or "").strip()
     if not msg:
         return None
+    # "playwright._impl._errors.TimeoutError: ..." / "requests.exceptions.ConnectionError: ..." -> the bare class name
+    msg = re.sub(r"^[\w.]+\.(\w+(?:Error|Exception|Failed|Interrupt)):", r"\1:", msg)
     first = msg.split("\n", 1)[0].strip()
+    if not exc_type:
+        m0 = re.match(r"^(\w+(?:Error|Exception|Failed|Interrupt))\b", first)
+        exc_type = m0.group(1) if m0 else None
     t = exc_type or ""
+    m0 = re.match(r"^(?:Setup|Teardown|Keyword) failed:\s*(.+)$", msg, re.S)
+    if m0 and m0.group(1).strip():
+        inner = explain(m0.group(1).strip(), None)
+        if inner:
+            return inner
 
-    out = _playwright(msg, first) or _selenium(msg, first, t) or _http(msg, first, t) or _assertion(msg, first, t) or _python(msg, first, t)
+    out = _playwright(msg, first) or _selenium(msg, first, t) or _robot(msg, first, t) or _http(msg, first, t) or _assertion(msg, first, t) or _python(msg, first, t)
     return out or _out("thrown", short(first), "See the full message and stack trace below.")
 
 
@@ -80,7 +90,9 @@ def _playwright(msg: str, first: str) -> Optional[Dict[str, Any]]:
         or _pick(msg, r"(?:waiting for|Locator:\s*)\s*(getBy\w+\([^\n]*?\)(?:\.\w+\([^\n]*?\))*)", re.M)
     timeout = _pick(msg, r"(?:Timeout|timeout of|Timed out)\s+(\d+)ms", re.I)
     timeout_ms = int(timeout) if timeout else None
-    action = _pick(first, r"^(?:Error: |TimeoutError: )?([a-zA-Z_]+\.[a-zA-Z_]+):")
+    action = _pick(first, r"^(?:\w+(?:Error|Exception): )?([a-zA-Z_]+\.[a-zA-Z_]+):")
+    if action:
+        action = action[:1].lower() + action[1:]
     url = _pick(msg, r"(?:navigating to|at)\s+\"?(https?://[^\s\"]+)")
     t = (" within " + secs(timeout_ms)) if timeout_ms else ""
 
@@ -212,9 +224,9 @@ def _selenium(msg: str, first: str, t: str) -> Optional[Dict[str, Any]]:
         return None
     loc = _pick(msg, r"Unable to locate element:\s*\{?\"?method\"?:\s*\"?([^\"}\n]+)\"?,\s*\"?selector\"?:\s*\"?([^\"}\n]+)")
     sel = None
-    m = re.search(r"\"method\":\s*\"([^\"]+)\",\s*\"selector\":\s*\"([^\"]+)\"", msg) or re.search(r"\{\"?method\"?:\s*\"?([\w ]+)\"?,\s*\"?selector\"?:\s*\"?(.+?)\"?\}", msg)
+    m = re.search(r"\"method\":\s*\"([^\"]+)\",\s*\"selector\":\s*\"((?:[^\"\\]|\\.)+)\"", msg) or re.search(r"\{\"?method\"?:\s*\"?([\w ]+)\"?,\s*\"?selector\"?:\s*\"?(.+?)\"?\}", msg)
     if m:
-        sel = f"{m.group(1)}: {m.group(2)}"
+        sel = f"{m.group(1)}: {m.group(2).replace(chr(92) + chr(34), chr(34))}"
     kind = t or _pick(first, r"^(\w+Exception)") or ""
     if kind == "NoSuchElementException" or "Unable to locate element" in msg or "no such element" in msg:
         return _out("not-found", f"{sel or 'The element'} was not on the page.", "Check the locator, and whether the element is inside an iframe, behind a login, or only shown after another step. An explicit wait may be needed.", locator=sel)
@@ -253,6 +265,45 @@ def _selenium(msg: str, first: str, t: str) -> Optional[Dict[str, Any]]:
 _SELENIUM = {"NoSuchElementException", "ElementClickInterceptedException", "ElementNotInteractableException", "StaleElementReferenceException",
              "TimeoutException", "NoSuchWindowException", "NoSuchFrameException", "InvalidSelectorException", "UnexpectedAlertPresentException",
              "NoAlertPresentException", "SessionNotCreatedException", "WebDriverException", "InvalidElementStateException", "MoveTargetOutOfBoundsException"}
+
+
+# ── Robot Framework: SeleniumLibrary, Browser library, BuiltIn ─────────────────────────────────────
+def _robot(msg: str, first: str, t: str) -> Optional[Dict[str, Any]]:
+    m = re.search(r"Element(?: with locator)? '([^']+)' not found", first)
+    if m:
+        return _out("not-found", f"{m.group(1)} was not on the page.", "Check the locator, and whether the element is inside an iframe, behind a login, or only shown after another step. Wait Until Element Is Visible may be needed.", locator=m.group(1))
+    m = re.search(r"Element '([^']+)' (?:did not appear|was not visible|not visible) in (\S+ \w+)", first) or re.search(r"Element '([^']+)' (?:did not appear|was not visible)", first)
+    if m:
+        return _out("not-visible", f"{m.group(1)} did not become visible in time.", "The element may still be loading, be hidden by CSS, or sit inside a closed menu or dialog.", locator=m.group(1))
+    m = re.search(r"Element '([^']+)' (?:is|should have been) (?:not |un)?(enabled|disabled|visible|selected)", first)
+    if m:
+        return _out("assertion", f"{m.group(1)} was not in the expected state ({m.group(2)}).", "Check the step before this one.", locator=m.group(1))
+    m = re.search(r"(?:Page|Element '([^']+)') should have contained (?:text )?'([^']+)' but (?:did not|its text was '([^']*)')", first)
+    if m:
+        who = m.group(1) or "The page"
+        return _out("assertion", f"{who} did not contain {m.group(2)!r}" + (f", its text was {m.group(3)!r}" if m.group(3) else "") + ".", "Compare expected and received below. A copy change, a data change or a timing issue are the usual causes.", locator=m.group(1))
+    m = re.search(r"(?:Location|Title|URL) should have been '([^']+)' but was '([^']+)'", first)
+    if m:
+        return _out("assertion", f"The {first.split()[0].lower()} was {m.group(2)!r}, expected {m.group(1)!r}.", "The navigation may not have happened yet, or it went to a different page.")
+    m = re.search(r"^(?:Test|Keyword) timeout (\S+ \w+) exceeded", first, re.I)
+    if m:
+        return _out("test-timeout", f"The test took longer than {m.group(1)}.", "Find the slow step in the Steps list below. Raise the timeout only if the flow is really that long.")
+    m = re.search(r"No keyword with name '([^']+)' found", first)
+    if m:
+        return _out("undefined-step", f"No keyword named {m.group(1)!r} exists.", "Check the spelling, and that the library or resource that defines it is imported.")
+    m = re.search(r"Keyword '([^']+)' expected (\d+(?: to \d+)?) arguments?, got (\d+)", first)
+    if m:
+        return _out("script", f"{m.group(1)} was called with {m.group(3)} arguments, it takes {m.group(2)}.", "Check the keyword call. A missing or extra argument, or two spaces missing between arguments, is the usual cause.")
+    m = re.search(r"Variable '([^']+)' not found", first)
+    if m:
+        return _out("script", f"The variable {m.group(1)} was never set.", "Check the spelling and that the variable is set or imported before this step.")
+    if re.search(r"^(?:Browser|No browser is open|Cannot access execution context)", first):
+        return _out("closed", "No browser was open when this step ran.", "Open the browser first (Open Browser / New Page), or check that an earlier step did not close it.")
+    m = re.search(r"TimeoutError: (?:locator\.|page\.)?(\w+): Timeout (\d+)ms exceeded", msg)   # Browser library (Playwright)
+    if m:
+        loc = _pick(msg, r"waiting for (locator\([^\n]*?\)|[^\n]*?selector[^\n]*)")
+        return _out("not-found", f"{loc or 'The element'} was not ready for {m.group(1)} within {secs(int(m.group(2)))}.", "Check the selector. The element may be inside an iframe, behind a login, or only shown after another step.", action=m.group(1), locator=loc, timeoutMs=int(m.group(2)))
+    return None
 
 
 # ── HTTP clients: requests, httpx, urllib ───────────────────────────────────────────────────────────

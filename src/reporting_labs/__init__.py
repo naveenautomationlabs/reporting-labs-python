@@ -26,7 +26,15 @@ from ._version import __version__
 from .core import context
 from .core.model import ErrorInfo, now_ms
 
-__all__ = ["meta", "log", "test_data", "step", "api", "attach", "__version__"]
+__all__ = ["meta", "log", "test_data", "step", "api", "attach", "RobotListener", "__version__"]
+
+
+def __getattr__(name: str) -> Any:
+    # `robot --listener reporting_labs.RobotListener`: imported lazily so a pytest project never loads Robot code
+    if name == "RobotListener":
+        from .robot.listener import ReportingLabsListener
+        return ReportingLabsListener
+    raise AttributeError(name)
 
 
 def meta(**values: Any) -> None:

@@ -130,6 +130,11 @@ class Runtime:
             attempt.add_error(err)
             _on_failure(item, attempt, exc)
         if call.when == "teardown":
+            for mod in ("playwright_support", "selenium_support"):
+                try:
+                    __import__(f"reporting_labs.{mod}", fromlist=["after_teardown"]).after_teardown(item, attempt)
+                except Exception:
+                    pass
             for name, text in report.sections:
                 if "stdout" in name and text:
                     attempt.stdout.append(text)
@@ -228,6 +233,15 @@ class Controller:
         plugins = [f"{n} {v}" for n, v in ((n, package_version(n)) for n in ("pytest-playwright", "playwright", "selenium", "pytest-xdist", "pytest-rerunfailures", "pytest-timeout", "requests", "httpx")) if v]
         if plugins:
             rows.append({"k": "Packages", "v": ", ".join(plugins)})
+        return rows
+
+    def _tool_rows(self) -> List[Dict[str, str]]:
+        rows: List[Dict[str, str]] = []
+        for mod in ("playwright_support", "selenium_support"):
+            try:
+                rows.extend(__import__(f"reporting_labs.{mod}", fromlist=["env_rows"]).env_rows())
+            except Exception:
+                pass
         return rows
 
     def pytest_sessionstart(self, session: pytest.Session) -> None:
@@ -363,6 +377,7 @@ class Controller:
                 if not t.attempts:
                     t.forced_outcome = "interrupted"
         try:
+            self.run.framework_rows = self._framework_rows() + self._tool_rows()
             data = self.run.build()
             html = writer.write(data, self.opts)
         except Exception as e:  # never fail the test session because of the report
