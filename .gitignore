@@ -1,0 +1,25 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Report output and run history from local runs
+reporting-labs/
+reporting-labs.history.json
+examples/**/reporting-labs/
+examples/**/output.xml
+examples/**/log.html
+examples/**/report.html
+test-results/
+
+# Editors
+.idea/
+.vscode/
+.DS_Store

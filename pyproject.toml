@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reporting-labs"
+dynamic = ["version"]
+description = "A beautiful test report in one HTML file, for pytest, Playwright, Selenium and Robot Framework. It tells you what broke, who owns it, and whether it is new."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Naveen Khunteta", email = "naveenanimation20@gmail.com" }]
+keywords = ["pytest", "playwright", "selenium", "robotframework", "test-report", "html-report", "reporting", "allure-alternative"]
+classifiers = [
+    "Framework :: Pytest",
+    "Framework :: Robot Framework",
+    "Framework :: Robot Framework :: Tool",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = []
+
+[project.optional-dependencies]
+pytest = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "pytest-xdist>=3.0", "pytest-rerunfailures>=12.0", "pytest-timeout>=2.1", "requests>=2.25", "httpx>=0.23", "playwright>=1.40", "selenium>=4.10", "robotframework>=6.0"]
+
+[project.urls]
+Homepage = "https://reportinglabs.dev"
+Documentation = "https://reportinglabs.dev/get-started/python"
+Repository = "https://github.com/naveenautomationlabs/reporting-labs-python"
+Issues = "https://github.com/naveenautomationlabs/reporting-labs-python/issues"
+
+[project.entry-points.pytest11]
+reporting_labs = "reporting_labs.pytest_plugin"
+
+[tool.setuptools.dynamic]
+version = { attr = "reporting_labs._version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+reporting_labs = ["template.html", "py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:reporting_labs"
