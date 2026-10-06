@@ -85,7 +85,7 @@ class ReportingLabsListener:
         # [Documentation]  Checks the cart total.  @owner naveen  @priority P0  -> meta, like a docstring in pytest
         doc_values, doc_tags = doc_meta.parse(str(data.doc or "")) if self.opts.get("commentMeta") is not False else ({}, [])
         tags = [str(t) for t in data.tags]
-        tags += [t for t in doc_tags if t not in tags]
+        tags += [t for t in doc_tags if t not in tags and t.lower() not in self.opts.meta_keys()]
         self.run.test(self.test_id, data.name, list(self.suite_stack[1:]) if len(self.suite_stack) > 1 else [], file, int(data.lineno or 0),
                       self.project or "robot", tags=tags, timeout=_timeout_ms(data))
         self.attempt = Attempt(self.test_id)

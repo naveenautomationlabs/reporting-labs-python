@@ -7,8 +7,8 @@
         @smoke
         \"\"\"
 
-`@key value` pairs become meta; a bare `@word` becomes a tag (so `@P0` / `@critical` still set priority and
-severity). The same works in `#` comments right above the `def` (or its decorators), and on the class and the
+`@key value` pairs become meta; a line of bare `@words` becomes tags (so `@P0` / `@critical` still set priority
+and severity), while a mention in a sentence ("reported by @naveen") is ignored. The same works in `#` comments right above the `def` (or its decorators), and on the class and the
 module, which apply to every test inside. The test's own wins over its class, the class over the module;
 @pytest.mark.meta and meta() in the test win over all of them. Same syntax as the Node.js reporter."""
 from __future__ import annotations
@@ -28,6 +28,8 @@ def parse(text: str) -> Tuple[Dict[str, str], List[str]]:
     meta: Dict[str, str] = {}
     tags: List[str] = []
     for line in (text or "").splitlines():
+        # a bare @word is a tag only on a line of tags ("@smoke @regression"), never a mention in a sentence
+        tag_line = line.strip().startswith("@")
         for m in _PAIR.finditer(line):
             key = m.group(1)
             if key.lower() in _JSDOC or key.startswith("pytest."):
@@ -35,7 +37,7 @@ def parse(text: str) -> Tuple[Dict[str, str], List[str]]:
             value = re.sub(r"^(['\"`])(.*)\1$", r"\2", m.group(2).strip()).strip()  # @owner 'naveen' -> naveen
             if value:
                 meta[key.lower()] = value
-            elif key not in tags:
+            elif tag_line and key not in tags:
                 tags.append(key)
     return meta, tags
 

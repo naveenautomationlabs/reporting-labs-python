@@ -25,3 +25,8 @@ def test_docstring_noise_is_ignored():
 def test_quoted_values():
     meta, _ = parse("@owner 'naveen'  @feature \"Cart and checkout\"")
     assert meta == {"owner": "naveen", "feature": "Cart and checkout"}
+
+
+def test_mentions_in_sentences_are_not_tags():
+    meta, tags = parse("Regression reported by @naveen, thanks @asha\n@smoke")
+    assert tags == ["smoke"]

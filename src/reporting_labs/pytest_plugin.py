@@ -235,7 +235,10 @@ def _item_info(item: pytest.Item) -> Dict[str, Any]:
                 pass
     try:
         opts = getattr(item.config, "_rl_opts", None)
+        keys = opts.meta_keys() if opts is not None else []
         for tag in ([] if opts is not None and opts.get("commentMeta") is False else doc_meta.for_item(item)[1]):
+            if tag.lower() in keys:
+                continue  # a meta key left without a value (@priority) is not a tag
             if tag not in tags:
                 tags.append(tag)
     except Exception:
