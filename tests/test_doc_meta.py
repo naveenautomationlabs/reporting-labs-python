@@ -20,3 +20,8 @@ def test_separators_and_bare_tags():
 
 def test_docstring_noise_is_ignored():
     assert parse("Contact naveen@x.com.\n@param x the value\n@returns nothing\n@pytest.mark.slow") == ({}, [])
+
+
+def test_quoted_values():
+    meta, _ = parse("@owner 'naveen'  @feature \"Cart and checkout\"")
+    assert meta == {"owner": "naveen", "feature": "Cart and checkout"}

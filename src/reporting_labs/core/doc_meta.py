@@ -32,7 +32,7 @@ def parse(text: str) -> Tuple[Dict[str, str], List[str]]:
             key = m.group(1)
             if key.lower() in _JSDOC or key.startswith("pytest."):
                 continue
-            value = m.group(2).strip()
+            value = re.sub(r"^(['\"`])(.*)\1$", r"\2", m.group(2).strip()).strip()  # @owner 'naveen' -> naveen
             if value:
                 meta[key.lower()] = value
             elif key not in tags:
