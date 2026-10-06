@@ -1,5 +1,9 @@
 # reportingLabs for Python
 
+[![PyPI](https://img.shields.io/pypi/v/reporting-labs.svg?label=PyPI)](https://pypi.org/project/reporting-labs/)
+[![Docs](https://img.shields.io/badge/docs-reportinglabs.dev-1A56DB.svg)](https://reportinglabs.dev)
+[![Support reportingLabs](https://img.shields.io/badge/%E2%99%A5%20Support-reportingLabs-E5405E?style=flat)](https://reportinglabs.dev/support)
+
 **One beautiful HTML report for pytest, Playwright, Selenium and Robot Framework.** It tells you what broke,
 who owns it, and whether it is new. The whole report is a single self-contained HTML file: no server, no
 upload, no login. Open it in a browser, attach it to a CI job, or drop it in Slack.
