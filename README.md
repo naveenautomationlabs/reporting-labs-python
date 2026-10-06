@@ -138,6 +138,10 @@ reportingLabs is a library that runs inside your own test run. There is no repor
 
 Full details for security reviewers and client projects, including what is read, what is written and what to tell a client: [reportinglabs.dev/security-privacy](https://reportinglabs.dev/security-privacy). To report a vulnerability, open an issue saying you have a security report (no details) and a private channel will be arranged.
 
+## Support
+
+reportingLabs is free and MIT-licensed, with no paid tier. If it saves your team time, you can support its development at [reportinglabs.dev/support](https://reportinglabs.dev/support) (Razorpay for India, Stripe for everywhere else). A star on GitHub helps too.
+
 ## License
 
 MIT. The report is a file you own; nothing leaves your machine or your CI.

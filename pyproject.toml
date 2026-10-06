@@ -32,6 +32,7 @@ Homepage = "https://reportinglabs.dev"
 Documentation = "https://reportinglabs.dev/get-started/python"
 Repository = "https://github.com/naveenautomationlabs/reporting-labs-python"
 Issues = "https://github.com/naveenautomationlabs/reporting-labs-python/issues"
+Funding = "https://reportinglabs.dev/support"
 
 [project.entry-points.pytest11]
 reporting_labs = "reporting_labs.pytest_plugin"
