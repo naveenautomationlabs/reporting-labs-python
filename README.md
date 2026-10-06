@@ -58,6 +58,10 @@ def test_checkout(page):
 
 Turn it off for a run with `-p no:reporting_labs` or `--no-rl`.
 
+**Meta without code:** the same `@priority P0 @owner asha @feature checkout` can go in the test's docstring (or
+`#` comments above the `def`, the class or the module) instead of the marker. The marker and `meta()` still win when both
+are there. Robot Framework reads it from `[Documentation]`.
+
 ## Playwright
 
 Install `pytest-playwright` and write tests as usual. Every action, every `expect()` and a screenshot of the

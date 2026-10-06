@@ -25,6 +25,7 @@ DEFAULTS: Dict[str, Any] = {
     "outputFile": "index.html",
     "emitJson": True,
     "jsonFile": "report.json",
+    "commentMeta": True,         # read meta from docstrings / comments: @owner naveen @priority P0 (meta() wins)
     "pdf": True,                 # also write a print-ready report.pdf (Playwright's Chromium, or an installed Chrome / Edge)
     "pdfFile": "report.pdf",
     "chromePath": None,          # the browser that prints report.pdf, when it is not found on its own (or CHROME_PATH)

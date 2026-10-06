@@ -140,7 +140,8 @@ def missing_meta(tests: List[Dict[str, Any]], options: Options) -> List[str]:
     lines += [f"    {(t['file'] + ':' + str(t['line'])).ljust(width)}  {t['title']}" for t in show]
     if len(missing) > len(show):
         lines.append(f"    … and {len(missing) - len(show)} more")
-    lines.append("    Add meta(priority='P1', owner='name', feature='area') to the test. Set warnMissingMeta: false to hide this.")
+    lines.append("    Add meta(priority='P1', owner='name', feature='area') to the test, or put it in the docstring:")
+    lines.append('    """@priority P1 @owner name @feature area""". Set warnMissingMeta: false to hide this.')
     return lines
 
 

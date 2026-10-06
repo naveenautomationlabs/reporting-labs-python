@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..core import collector, context, options as options_mod, writer
+from ..core import collector, context, doc_meta, options as options_mod, writer
 from ..core.model import Attempt, ErrorInfo, Step, now_ms
 
 _IMG = re.compile(r"<img[^>]+src=[\"']([^\"']+)[\"']", re.I)
@@ -82,9 +82,17 @@ class ReportingLabsListener:
         self.test_id = data.longname
         source = str(data.source) if data.source else ""
         file = os.path.relpath(source, str(self.opts.base)).replace(os.sep, "/") if source else ""
+        # [Documentation]  Checks the cart total.  @owner naveen  @priority P0  -> meta, like a docstring in pytest
+        doc_values, doc_tags = doc_meta.parse(str(data.doc or "")) if self.opts.get("commentMeta") is not False else ({}, [])
+        tags = [str(t) for t in data.tags]
+        tags += [t for t in doc_tags if t not in tags]
         self.run.test(self.test_id, data.name, list(self.suite_stack[1:]) if len(self.suite_stack) > 1 else [], file, int(data.lineno or 0),
-                      self.project or "robot", tags=[str(t) for t in data.tags], timeout=_timeout_ms(data))
+                      self.project or "robot", tags=tags, timeout=_timeout_ms(data))
         self.attempt = Attempt(self.test_id)
+        keys = self.opts.meta_keys()  # known keys only, like meta from comments in Node.js
+        for k, v in doc_values.items():
+            if k in keys:
+                self.attempt.meta.setdefault(k, v)
         if data.doc:
             self.attempt.log(str(data.doc))
         context.activate(self.attempt)

@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 from . import transport
-from .core import collector, context, options as options_mod, writer
+from .core import collector, context, doc_meta, options as options_mod, writer
 from .core.model import Attempt, ErrorInfo, now_ms
 
 BROWSER_PARAMS = {"chromium", "firefox", "webkit", "chrome", "msedge", "chrome-beta", "msedge-beta", "msedge-dev"}
@@ -59,6 +59,7 @@ def pytest_configure(config: pytest.Config) -> None:
             overrides[key] = v
     opts = options_mod.load(root, overrides, config.getoption("--rl-config") or config.getini("reporting_labs_config") or None)
     project = config.getoption("--rl-project") or config.getini("reporting_labs_project") or ""
+    config._rl_opts = opts  # type: ignore[attr-defined]
     config.pluginmanager.register(Runtime(opts), "reporting_labs_runtime")
     if opts.get("captureApi") is not False:
         from .capture import http
@@ -103,6 +104,7 @@ class Runtime:
         item._rl_attempt = attempt  # type: ignore[attr-defined]
         context.activate(attempt)
         _apply_markers(item, attempt)
+        _apply_doc_meta(item, attempt, self.opts)
         yield
 
     @pytest.hookimpl(hookwrapper=True)
@@ -187,6 +189,20 @@ def _apply_markers(item: pytest.Item, attempt: Attempt) -> None:
                     attempt.meta.setdefault(str(k).lower(), v)
 
 
+def _apply_doc_meta(item: pytest.Item, attempt: Attempt, opts: Any) -> None:
+    """Meta from the docstring / comment above the test (and its class and module); markers and meta() win."""
+    if opts.get("commentMeta") is False:
+        return
+    try:
+        meta, _ = doc_meta.for_item(item)
+    except Exception:
+        return
+    keys = opts.meta_keys()  # known keys only, so a stray "# TODO @naveen fix" never becomes a chip
+    for k, v in meta.items():
+        if k in keys:
+            attempt.meta.setdefault(k, v)
+
+
 def _worker_index() -> int:
     w = os.environ.get("PYTEST_XDIST_WORKER", "")
     m = re.match(r"gw(\d+)$", w)
@@ -217,6 +233,13 @@ def _item_info(item: pytest.Item) -> Dict[str, Any]:
                 timeout = float(mark.args[0]) * 1000
             except (TypeError, ValueError):
                 pass
+    try:
+        opts = getattr(item.config, "_rl_opts", None)
+        for tag in ([] if opts is not None and opts.get("commentMeta") is False else doc_meta.for_item(item)[1]):
+            if tag not in tags:
+                tags.append(tag)
+    except Exception:
+        pass
     return {"tags": tags, "project": project, "timeout": timeout, "file": str(getattr(item, "fspath", "") or getattr(item, "path", ""))}
 
 
