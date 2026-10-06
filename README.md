@@ -58,10 +58,45 @@ def test_checkout(page):
 
 Turn it off for a run with `-p no:reporting_labs` or `--no-rl`.
 
-**Meta without code:** the same `@priority P0 @owner asha @feature checkout` can go in the test's docstring (or
-`#` comments above the `def`, the class or the module) instead of the marker. The marker and `meta()` still win when both
-are there. Robot Framework reads it from `[Documentation]`. `python -m reporting_labs snippets` adds VS Code snippets:
-type `rlmeta` (or `rltest`) and press Tab.
+### Meta: two ways, your choice
+
+Meta (priority, owner, feature, story) can be added in **two ways**. Both give **exactly the same report**, so use
+whichever you like:
+
+```python
+# Way 1: the marker (or meta() inside the test)
+@pytest.mark.meta(priority="P0", owner="asha", feature="checkout", story="SHOP-12")
+def test_checkout(page):
+    ...
+
+# Way 2: the test's docstring, no marker, no import
+def test_checkout(page):
+    """Places an order with a saved card.
+
+    @priority P0  @owner asha  @feature checkout  @story SHOP-12
+    @smoke
+    """
+    ...
+```
+
+- **Already using the marker or `meta()`?** Nothing changes. Docstrings are only an extra option.
+- **Mix them freely.** If one test has both, the marker / `meta()` wins.
+- `#` comments right above the `def` work too. A **class** docstring applies to every test in the class, the
+  **module** docstring at the top of the file to every test in the file.
+- A line with only `@words` (`@smoke @regression`) becomes tags; `@P0` sets the priority.
+- **Your old docstrings are safe:** a name in a sentence ("reported by @asha") and unknown keys are ignored.
+- **Robot Framework:** write it in `[Documentation]`: `@owner naveen    @priority P0`.
+- Turn it off with `"commentMeta": false`.
+
+**Don't type it by hand: install the snippets.** In VS Code:
+
+1. In the project folder (virtualenv active), run `python -m reporting_labs snippets`. It creates
+   `.vscode/reporting-labs.code-snippets`.
+2. Inside a test, type `rlmeta` and press **Tab** for the docstring (or `rltest` for a whole test). Pick the priority
+   from the list, then **Tab** to the next field.
+3. Commit the `.vscode` file so the whole team gets the snippets.
+
+For PyCharm, see [Install the editor snippets](https://reportinglabs.dev/features/meta-comments#install-the-editor-snippets).
 
 ## Playwright
 
@@ -112,10 +147,49 @@ Every option is optional. Put them in `reporting-labs.config.json` next to where
 }
 ```
 
-Common options: `title`, `logo`, `accent`, `theme` (`auto` / `light` / `dark`), `palette`
-(`lab` / `ocean` / `ember` / `mono`), `outputFolder`, `metadata`, `project`, `env`, `dimensions`,
-`links`, `maskKeys`, `maskValues`, `maskFromEnv`, `history`, `open` (`on-failure` / `always` / `never`),
-`pdf` (`true` / `false`), `pdfFile`, `chromePath`.
+All options:
+
+| Option | Default | What it does |
+|---|---|---|
+| `title` | `"Test report"` | Title in the header |
+| `logo` | – | Your logo next to the title: a file next to the config (embedded in the report) or an https URL |
+| `project` | – | `{ "name", "version", "team", "url" }` shown under the title |
+| `metadata` | `{}` | Chips in the header, e.g. `{ "env": "staging", "build": "#1842" }`. `build` labels the run in the trend |
+| `envVar` | – | Name of the variable that holds the environment name, when the detection cannot guess it |
+| `env` | `{}` | Extra rows on the Environment card |
+| `links` | `{}` | Turn meta values into links: `{ "story": "https://acme.atlassian.net/browse/{id}" }` |
+| `maskKeys` | `[]` | Extra keys to mask as `****` |
+| `maskValues` | `[]` | Literal values to blank wherever they appear, keyed or not |
+| `maskFromEnv` | `true` | Learn the values of sensitive-looking environment variables (`PASSWORD`, `API_TOKEN`) and blank them everywhere |
+| `dimensions` | `["priority", "severity", "feature", "owner"]` | Meta keys that get a tab in the Breakdown chart and a filter on the Tests page. Add your own, e.g. `"team"` |
+| `dimensionOrder` | P0…P4, blocker…trivial | The order values appear in those charts and filters, e.g. `{ "severity": ["high", "medium", "low"] }` |
+| `commentMeta` | `true` | Also read meta from docstrings and `#` comments (`@priority P0 @owner asha`). The marker and `meta()` win when both are there. `false` reads no comments |
+| `warnMissingMeta` | `true` | After the run, list the tests that have no meta in the console |
+| `widgets` | all on | Hide cards: `{ "tags": false, "timeline": false }` |
+| `sections` | `[]` | Extra HTML below the summary, e.g. release notes: `[{ "title": "...", "html": "..." }]` |
+| `history` | `{ "enabled": true, "keep": 30 }` | Run history for the trend; `file` sets a custom path |
+| `palette` | `"lab"` | `"lab"` (blue), `"ocean"`, `"ember"`, `"mono"` |
+| `accent` | palette accent | Your brand color |
+| `theme` | `"auto"` | `"light"`, `"dark"` or follow the OS |
+| `customCss` | `""` | CSS appended to the report |
+| `editorLinks` | on locally, off in CI | "Open in VS Code" links |
+| `bdd` | auto | Style Given / When / Then steps as Gherkin |
+| `outputFolder` | `"reporting-labs"` | Where the report goes |
+| `outputFile` | `"index.html"` | Report file name |
+| `embedAttachments` | `true` | Screenshots inside the HTML (one file) |
+| `embedLimit` | 2 MB | Bigger attachments are copied to `./assets` |
+| `embedVideos` | `false` | Videos inside the HTML too |
+| `emitJson` | `true` | Also write `report.json` next to `index.html` |
+| `jsonFile` | `"report.json"` | File name of the JSON |
+| `pdf` | `true` | Also write a print-ready `report.pdf`. `false` turns it off |
+| `pdfFile` | `"report.pdf"` | File name of the PDF |
+| `chromePath` | – | The Chrome / Edge / Chromium that prints the PDF, when it is not found on its own (or set `CHROME_PATH`) |
+| `embedFonts` | `true` | Bundle the fonts (~140 KB) so the report looks the same offline |
+| `announce` | `true` | Print the report path after the run |
+| `open` | `"on-failure"` | Open the report in the browser after the run: `"on-failure"`, `"always"` or `"never"`. Never opens in CI |
+| `captureApi` | `true` | Record every `requests` / `httpx` call in the API tab |
+| `apiMaxBody` | 64 KB | Bytes of a request or response body kept |
+| `stepsFromTools` | `true` | Playwright and Selenium actions as steps |
 
 **report.pdf** is printed by Playwright's Chromium if it is installed, otherwise by an installed Chrome, Edge or
 Chromium, whatever browser the tests ran on. Name one with `chromePath` or `CHROME_PATH`.
