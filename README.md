@@ -205,11 +205,36 @@ set the matching option.
 
 ## Secrets are masked
 
-Passwords, tokens, cookies, auth headers, API keys (Stripe, GitHub, AWS, Google, GitLab, npm, SendGrid),
-JWTs and Luhn-valid card numbers are blanked in logs, request and response bodies, error messages, test
-data and step titles. A value seen once as a secret (`password=...`, a `PASSWORD` env var, or `maskValues`)
-is blanked everywhere it later appears. `maskKeys` adds your own keys; `maskFromEnv` (on by default) learns
-the values of `PASSWORD` / `*_TOKEN` / `*_SECRET` environment variables.
+Passwords, tokens and card numbers never reach the report. They are replaced with `****` **before** anything is
+written, with no setup.
+
+**Where:** logs, request and response bodies, error messages, test data and step titles. Values typed into password
+fields with Playwright or Selenium are masked too.
+
+**What it catches:**
+
+| Kind | Examples |
+|---|---|
+| Passwords and keys | `password=...`, `token`, `api_key`, cookies |
+| Auth headers | `Authorization: Bearer …`, `Basic …` |
+| Tokens | JWTs, and Stripe, GitHub, AWS, Google, GitLab, npm and SendGrid keys |
+| Card numbers | any valid card number (Luhn check) |
+
+**It remembers.** Once a value has been masked (or comes from a `PASSWORD`, `*_TOKEN` or `*_SECRET` environment
+variable), it is masked everywhere it shows up later, even with no key around it.
+
+**Add your own:**
+
+```json
+{
+  "maskKeys": ["otp", "pan"],
+  "maskValues": ["a-value-it-cannot-know"],
+  "maskFromEnv": true
+}
+```
+
+`maskKeys` adds key names, `maskValues` exact values; `"maskFromEnv": false` stops learning values from environment
+variables.
 
 ## Security & privacy
 
