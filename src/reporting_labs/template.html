@@ -344,7 +344,8 @@ li.collapsed>ul{display:none}
 .wk .row{display:grid;grid-template-columns:36px 1fr 120px;gap:10px;align-items:center;font-size:12px}
 .wk .k{font:12px var(--mono);color:var(--ink-3)} .wk .bar{height:12px;display:flex;border-radius:3px;overflow:hidden;background:var(--skip-bg)} .wk .bar i{display:block;height:100%}
 .wk .n{font:11px var(--mono);color:var(--ink-3);text-align:right}
-.wk .row{grid-template-columns:36px 1fr auto} .wk .n{white-space:nowrap}
+.wk .row{grid-template-columns:36px 1fr 172px} .wk .n{white-space:nowrap}
+.wk.wk-sh .row{grid-template-columns:48px 1fr 172px}
 .proj-sfx{font-weight:400;color:var(--ink-3);font-size:.9em}
 /* the Breakdown card keeps its own height: a two-priority suite should not leave a tall empty card */
 .bd-card{align-self:start}
@@ -1560,13 +1561,23 @@ function trend(){
     h('div',{class:'trend-cap'}, h('span',{style:'color:var(--pass)'},'— pass rate'), h('span',{style:'color:var(--fail)'},'- - fail rate'), h('span',{style:'color:var(--accent)'},'▮ duration'), h('span',{style:'margin-left:auto'}, 'this run: '+rate(HIST[HIST.length-1])+'% · '+ms(HIST[HIST.length-1].duration)+(isSmallRun(HIST[HIST.length-1])?' · small run, not plotted':''))));
   return wrap;
 }
+function laneName(i){ return (data.workerLabels&&data.workerLabels[i])||'w'+i; }
 function workers(){
-  const lanes=[]; for(let i=0;i<data.workers;i++) lanes.push({i,tests:0,fail:0,ms:0});
-  for(const t of data.tests) for(const r of t.results){ const l=lanes[r.workerIndex]; if(!l) continue; l.tests++; l.ms+=r.duration; if(isFail(r.status)) l.fail++; }
+  const lanes=[]; for(let i=0;i<data.workers;i++) lanes.push({i,tests:0,fail:0,ms:0,failMs:0});
+  for(const t of data.tests) for(const r of t.results){ const l=lanes[r.workerIndex]; if(!l) continue; l.tests++; l.ms+=r.duration; if(isFail(r.status)){ l.fail++; l.failMs+=r.duration; } }
   const max=Math.max(...lanes.map(l=>l.ms),1), busy=lanes.reduce((a,l)=>a+l.ms,0);
-  const util=data.duration? Math.round(busy/(data.duration*data.workers)*100):0;
-  return h('div',{}, h('div',{class:'wk-sum'}, data.workers+' parallel worker'+(data.workers===1?'':'s')+' · '+util+'% busy · wall clock '+ms(data.duration)+' vs '+ms(busy)+' of test time'),
-    h('div',{class:'wk'}, lanes.map(l=>h('div',{class:'row'}, h('span',{class:'k'},'w'+l.i), h('span',{class:'bar'}, h('i',{style:'width:'+((l.ms-0)/max*100)+'%;background:'+(l.fail?'var(--fail)':'var(--pass)'),title:ms(l.ms)})), h('span',{class:'n'}, l.tests+' runs'+(l.fail?' · '+l.fail+' ✕':'')+' · '+ms(l.ms))))));
+  // merged shards: each shard's workers were only available while that shard ran
+  const SH=data.shardInfo&&data.shardInfo.length>1?data.shardInfo:null;
+  const cap=SH? SH.reduce((a,x)=>a+x.duration*x.workers,0) : data.duration*data.workers;
+  const util=cap? Math.min(100,Math.round(busy/cap*100)):0;
+  const perShard=SH? [...new Set(SH.map(x=>x.workers))] : null;
+  const head=!SH? data.workers+' parallel worker'+(data.workers===1?'':'s')
+    : perShard.length===1? SH.length+' shards × '+perShard[0]+' worker'+(perShard[0]===1?'':'s')+' = '+data.workers+' workers'
+    : SH.length+' shards · '+data.workers+' workers in total ('+Math.min(...perShard)+'–'+Math.max(...perShard)+' per shard)';
+  return h('div',{}, h('div',{class:'wk-sum'}, head+' · '+util+'% busy · wall clock '+ms(data.duration)+' vs '+ms(busy)+' of test time'),
+    h('div',{class:'wk'+(SH?' wk-sh':'')}, lanes.map(l=>h('div',{class:'row'}, h('span',{class:'k'},laneName(l.i)),
+      h('span',{class:'bar',title:ms(l.ms)+(l.fail?' · '+ms(l.failMs)+' in failed tests':'')}, h('i',{style:'width:'+((l.ms-l.failMs)/max*100)+'%;background:var(--pass)'}), l.failMs?h('i',{style:'width:'+(l.failMs/max*100)+'%;background:var(--fail)'}):null),
+      h('span',{class:'n'}, l.tests+' runs'+(l.fail?' · '+l.fail+' failed':'')+' · '+ms(l.ms))))));
 }
 function byFile(){
   const m=new Map(); for(const t of data.tests){ const e=m.get(t.file)||{n:0,f:0,fl:0,ms:0}; e.n++; e.ms+=t.duration; if(isFail(t.outcome)) e.f++; if(t.outcome==='flaky') e.fl++; m.set(t.file,e); }
@@ -1576,12 +1587,12 @@ function byFile(){
     h('span',{class:'n'}, e.f?h('b',{},e.f+' ✕ '):null, e.n))));
 }
 function timeline(){
-  const W=900, laneH=18, pad=44, gap=6;
+  const W=900, laneH=18, pad=data.workerLabels?62:44, gap=6;
   const t0=data.startTime, t1=Math.max(...data.tests.flatMap(t=>t.results.map(r=>r.startTime+r.duration)), t0+1);
   const span=t1-t0, H=data.workers*(laneH+gap)+24;
   const x = t => pad+ (t-t0)/span*(W-pad-8);
   let s='';
-  for(let i=0;i<data.workers;i++){ const y=i*(laneH+gap)+2; s+='<rect class="lane" x="'+pad+'" y="'+y+'" width="'+(W-pad-8)+'" height="'+laneH+'" rx="2"/><text x="0" y="'+(y+13)+'">w'+i+'</text>'; }
+  for(let i=0;i<data.workers;i++){ const y=i*(laneH+gap)+2; s+='<rect class="lane" x="'+pad+'" y="'+y+'" width="'+(W-pad-8)+'" height="'+laneH+'" rx="2"/><text x="0" y="'+(y+13)+'">'+escape(laneName(i))+'</text>'; }
   for(const t of data.tests) for(const r of t.results){
     const y=r.workerIndex*(laneH+gap)+2, x0=x(r.startTime), w=Math.max(2,x(r.startTime+r.duration)-x0);
     const c = isFail(r.status)?'var(--fail)': r.status==='skipped'?'var(--skip)': (t.outcome==='flaky'?'var(--flaky)':'var(--pass)');
