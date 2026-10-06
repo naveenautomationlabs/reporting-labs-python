@@ -8,6 +8,8 @@
 who owns it, and whether it is new. The whole report is a single self-contained HTML file: no server, no
 upload, no login. Open it in a browser, attach it to a CI job, or drop it in Slack.
 
+> ♥ **Free and open source, no paid tier.** If reportingLabs saves your team time, [support its development](https://reportinglabs.dev/support) (Razorpay for India, Stripe for everywhere else). A ⭐ on GitHub helps too.
+
 The report is byte-for-byte the same layout as the [Node.js](https://github.com/naveenautomationlabs/reporting-labs)
 and [Java](https://github.com/naveenautomationlabs/reporting-labs-java) reporters, so one triage habit works
 across a whole company. Nothing from Node is needed at run time: the report is built entirely in Python.
@@ -141,10 +143,6 @@ reportingLabs is a library that runs inside your own test run. There is no repor
 - **No required dependencies;** it uses the pytest, Playwright, Selenium, requests, httpx or Robot Framework your project already installs. No install or post-install scripts. MIT licensed.
 
 Full details for security reviewers and client projects, including what is read, what is written and what to tell a client: [reportinglabs.dev/security-privacy](https://reportinglabs.dev/security-privacy). To report a vulnerability, open an issue saying you have a security report (no details) and a private channel will be arranged.
-
-## Support
-
-reportingLabs is free and MIT-licensed, with no paid tier. If it saves your team time, you can support its development at [reportinglabs.dev/support](https://reportinglabs.dev/support) (Razorpay for India, Stripe for everywhere else). A star on GitHub helps too.
 
 ## License
 
