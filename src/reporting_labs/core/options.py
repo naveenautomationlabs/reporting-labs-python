@@ -25,8 +25,9 @@ DEFAULTS: Dict[str, Any] = {
     "outputFile": "index.html",
     "emitJson": True,
     "jsonFile": "report.json",
-    "pdf": True,                 # also write a print-ready report.pdf (Playwright's Chromium, or system Chrome)
+    "pdf": True,                 # also write a print-ready report.pdf (Playwright's Chromium, or an installed Chrome / Edge)
     "pdfFile": "report.pdf",
+    "chromePath": None,          # the browser that prints report.pdf, when it is not found on its own (or CHROME_PATH)
     "embedAttachments": True,
     "embedLimit": 2 * 1024 * 1024,
     "embedVideos": False,

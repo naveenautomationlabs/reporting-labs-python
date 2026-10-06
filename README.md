@@ -103,7 +103,11 @@ Every option is optional. Put them in `reporting-labs.config.json` next to where
 
 Common options: `title`, `logo`, `accent`, `theme` (`auto` / `light` / `dark`), `palette`
 (`lab` / `ocean` / `ember` / `mono`), `outputFolder`, `metadata`, `project`, `env`, `dimensions`,
-`links`, `maskKeys`, `maskValues`, `maskFromEnv`, `history`, `open` (`on-failure` / `always` / `never`).
+`links`, `maskKeys`, `maskValues`, `maskFromEnv`, `history`, `open` (`on-failure` / `always` / `never`),
+`pdf` (`true` / `false`), `pdfFile`, `chromePath`.
+
+**report.pdf** is printed by Playwright's Chromium if it is installed, otherwise by an installed Chrome, Edge or
+Chromium, whatever browser the tests ran on. Name one with `chromePath` or `CHROME_PATH`.
 
 **The environment chip** is found for you from `ENV`, `TEST_ENV`, `APP_ENV`, `TARGET_ENV`,
 `CI_ENVIRONMENT_NAME`, or any variable ending in `_ENV`, so a config that says `local` still labels the

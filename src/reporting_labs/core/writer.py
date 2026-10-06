@@ -29,28 +29,34 @@ def write(data: Dict[str, Any], options: Options) -> Path:
 
 
 def write_pdf(html: Path, options: Options) -> Optional[Path]:
-    """Render the report's print layout to report.pdf. Tries the Chromium that Playwright ships, then a
-    system Chrome/Chromium with --print-to-pdf. Returns the path on success, else None."""
+    """Render the report's print layout to report.pdf. Tries the Chromium that Playwright ships, then an
+    installed Chrome, Edge or Chromium with --print-to-pdf. Returns the path on success, else None."""
     pdf = html.parent / str(options.get("pdfFile") or "report.pdf")
-    url = html.resolve().as_uri()
-    # 1) Playwright, if it and its browser are installed
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            try:
-                page = browser.new_page()
-                page.goto(url, wait_until="load")
-                page.evaluate("async () => { if (window.reportingLabsPreparePrint) await window.reportingLabsPreparePrint(); }")
-                page.pdf(path=str(pdf), print_background=True, prefer_css_page_size=True)
-            finally:
-                browser.close()
-        if pdf.is_file() and pdf.stat().st_size:
-            return pdf
-    except Exception:
+        pdf.unlink()  # never leave a previous run's PDF next to this run's report
+    except OSError:
         pass
-    # 2) a system Chrome / Chromium, driven headless (the report builds its print layout on ?rl-print)
-    chrome = _find_chrome()
+    url = html.resolve().as_uri()
+    explicit = options.get("chromePath") or os.environ.get("CHROME_PATH")
+    # 1) Playwright, if it and its Chromium are installed (skipped when a browser is named explicitly)
+    if not explicit:
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                try:
+                    page = browser.new_page()
+                    page.goto(url, wait_until="load")
+                    page.evaluate("async () => { if (window.reportingLabsPreparePrint) await window.reportingLabsPreparePrint(); }")
+                    page.pdf(path=str(pdf), print_background=True, prefer_css_page_size=True)
+                finally:
+                    browser.close()
+            if pdf.is_file() and pdf.stat().st_size:
+                return pdf
+        except Exception:
+            pass
+    # 2) an installed Chrome / Edge / Chromium, driven headless (the report builds its print layout on ?rl-print)
+    chrome = str(explicit) if explicit and Path(str(explicit)).is_file() else _find_chrome()
     if chrome:
         try:
             subprocess.run(
@@ -66,14 +72,26 @@ def write_pdf(html: Path, options: Options) -> Optional[Path]:
 
 
 def _find_chrome() -> Optional[str]:
-    for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome", "chrome.exe"):
+    """Any Chromium-based browser can print the report: Chrome, Edge (on every Windows machine) or Chromium."""
+    candidates: List[str] = []
+    if sys.platform == "darwin":
+        candidates += ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                       "/Applications/Chromium.app/Contents/MacOS/Chromium",
+                       "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"]
+    elif os.name == "nt":
+        for base in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)"), os.environ.get("LOCALAPPDATA")):
+            if base:
+                candidates += [os.path.join(base, "Google", "Chrome", "Application", "chrome.exe"),
+                               os.path.join(base, "Microsoft", "Edge", "Application", "msedge.exe")]
+    for c in candidates:
+        if Path(c).is_file():
+            return c
+    for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome",
+                 "microsoft-edge", "microsoft-edge-stable", "msedge"):
         p = shutil.which(name)
         if p:
             return p
-    for c in ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-              "/Applications/Chromium.app/Contents/MacOS/Chromium",
-              r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-              r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"):
+    for c in ("/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/snap/bin/chromium"):
         if Path(c).is_file():
             return c
     return None
@@ -95,6 +113,9 @@ def announce_lines(html: Path, data: Dict[str, Any], options: Options) -> List[s
             except ValueError:
                 prel = str(pdf)
             lines.append(f"reporting-labs: PDF written to {prel}")
+        else:
+            lines.append("reporting-labs: PDF skipped - no Chrome, Edge or Chromium found "
+                         "(set chromePath, or pdf: false to silence)")
     lines += missing_meta(data["tests"], options)
     return lines
 
