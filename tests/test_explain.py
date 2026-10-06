@@ -99,3 +99,12 @@ def test_pytest_timeout():
 def test_selenium_selector_with_quotes():
     kind, s = k('NoSuchElementException: Message: no such element: Unable to locate element: {"method":"css selector","selector":"[id=\"nope\"]"}', "NoSuchElementException")
     assert kind == "not-found" and '[id="nope"]' in s
+
+
+def test_browser_crash_is_its_own_category():
+    kind, s = k("playwright._impl._errors.Error: BrowserContext.new_page: Target crashed", "Error")
+    assert kind == "crashed" and "crashed" in s
+    kind, _ = k("WebDriverException: Message: unknown error: session deleted because of page crash", "WebDriverException")
+    assert kind == "crashed"
+    kind, _ = k("playwright._impl._errors.TargetClosedError: Target page, context or browser has been closed", "TargetClosedError")
+    assert kind == "closed"

@@ -344,6 +344,10 @@ li.collapsed>ul{display:none}
 .wk .row{display:grid;grid-template-columns:36px 1fr 120px;gap:10px;align-items:center;font-size:12px}
 .wk .k{font:12px var(--mono);color:var(--ink-3)} .wk .bar{height:12px;display:flex;border-radius:3px;overflow:hidden;background:var(--skip-bg)} .wk .bar i{display:block;height:100%}
 .wk .n{font:11px var(--mono);color:var(--ink-3);text-align:right}
+.wk .row{grid-template-columns:36px 1fr auto} .wk .n{white-space:nowrap}
+.proj-sfx{font-weight:400;color:var(--ink-3);font-size:.9em}
+/* the Breakdown card keeps its own height: a two-priority suite should not leave a tall empty card */
+.bd-card{align-self:start}
 .wk-sum{font-size:13px;color:var(--ink-2);margin-bottom:10px}
 /* list: group toggle + folder tree */
 .tools .seg,.bug-tools .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
@@ -379,7 +383,9 @@ table.tbl{border-collapse:collapse;font-size:12.5px;width:100%;min-width:100%}
 .api-head .m{font:11px/1 var(--mono);font-weight:600;padding:4px 7px;border-radius:3px;color:#fff;background:var(--ink-3)}
 .api-head .m.GET{background:#2A7FBF} .api-head .m.POST{background:var(--pass)} .api-head .m.PUT,.api-head .m.PATCH{background:#C77D14} .api-head .m.DELETE{background:var(--fail)}
 .api-head .u{flex:1;font:12px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.api-head .sc{font:12px var(--mono);font-weight:600} .api-head .sc.ok{color:var(--pass)} .api-head .sc.bad{color:var(--fail)} .api-head .sc.warn{color:#9A6A00}
+.api-head .sc{font:12px var(--mono);font-weight:600} .api-head .sc.ok{color:var(--pass)} .api-head .sc.bad{color:var(--fail)} .api-head .sc.warn{color:#9A6A00} .api-head .sc.exp{color:var(--ink-2)}
+.sc-exp{margin-left:6px;font:500 10.5px var(--sans);color:var(--ink-3);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:1px 7px;vertical-align:1px}
+.api-stats .exp b{color:var(--ink-2)} .api-proj{color:var(--ink-3)}
 .api-head .d{font:11px var(--mono);color:var(--ink-3)}
 .api-body{display:grid;grid-template-columns:1fr 1fr;gap:0}
 @media (max-width:900px){.api-body{grid-template-columns:1fr}}
@@ -559,13 +565,15 @@ html,body{-webkit-font-smoothing:antialiased}
 .runbanner{margin-bottom:14px;padding:10px 14px;border-radius:10px;background:var(--flaky-bg);color:var(--flaky-ink);border:1px solid color-mix(in srgb,var(--flaky) 40%,transparent)}
 .note{padding:10px 14px;border-radius:8px;margin-bottom:10px;border:1px solid var(--line)} .note.ok{background:var(--pass-bg);color:var(--ink)} .note.warn{background:var(--flaky-bg);color:var(--flaky-ink)}
 .badge.xfail{background:var(--flaky-bg);color:var(--flaky-ink)}
+.xp{font-weight:500} .xp.all{color:var(--ink)} .xp.some{color:var(--flaky-ink)}
+.badge.xp{background:var(--surface-2);border:1px solid var(--line)} .badge.xp.some{background:var(--flaky-bg);border-color:transparent}
 .errwrap+.errwrap{margin-top:14px}
 .why{border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;background:var(--surface)}
 .why-c{font-size:12.5px;color:var(--ink);margin-bottom:2px;line-height:1.4;overflow-wrap:anywhere} .why-c .why-k{margin-right:2px}
 .why-l{display:flex;align-items:center;gap:8px;margin-bottom:4px} .why-k{font-size:12px;font-weight:600;color:var(--fail)} .why-a{font:11.5px var(--mono);color:var(--ink-3)}
 .why-s{font-size:var(--fs);color:var(--ink);line-height:1.45;overflow-wrap:anywhere} .why-h{font-size:12.5px;color:var(--ink-2);margin-top:4px;line-height:1.45;overflow-wrap:anywhere}
 .why.assertion .why-k,.why.visual .why-k{color:#9A6A00}
-.why.script .why-k,.why.thrown .why-k,.why.file .why-k{color:var(--ink-2)}
+.why.script .why-k,.why.thrown .why-k,.why.file .why-k,.why.crashed .why-k{color:var(--ink-2)}
 .errloc{font-family:var(--mono);color:var(--ink-3);margin-bottom:6px} .errloc a{color:var(--accent-2);text-decoration:none} .errloc a:hover{text-decoration:underline}
 .snip{margin:10px 0 0;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:var(--mono);line-height:1.55;white-space:pre;overflow:auto;color:var(--ink-2)}
 /* ---------- triage extras: history, diff, export, env, heatmap ---------- */
@@ -765,6 +773,14 @@ const HIST = data.history||[];
 const HRUNS = HIST.filter(e=>e&&e.tests);                 // entries that carry per-test outcomes; the last one is this run
 const PREV = HRUNS.length>1 ? HRUNS.slice(0,-1) : [];      // earlier runs only
 const runLabel = e => e.label || new Date(e.time).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+/* Run-level trends (Trend card, KPI sparklines and "from last run", pass rate by priority) only use full-size
+   runs. A debug run of one spec or a --grep shares the history file with the full suite; a failing 1-test run
+   would read as a 0% day. A run is "small" when it ran fewer than half the median size of the recorded runs.
+   Per-test history (dots, flaky, new vs known) still uses every run: there a run only counts for the tests in it. */
+const MED_SIZE = (()=>{ const z=HIST.map(e=>e.total||0).sort((a,b)=>a-b); return z.length? z[Math.floor(z.length/2)] : 0; })();
+const isSmallRun = e => HIST.length>=3 && (e.total||0) < MED_SIZE/2;
+const TREND = (()=>{ const f=HIST.filter((e,i)=>!isSmallRun(e)); return f.length>=2? f : HIST; })();
+const SMALL_HIDDEN = HIST.length - TREND.length;
 
 const state = { q:'', status:'all', project:'all', dims:{}, selected:null, retry:null, group:'file', open:{}, view:'overview' };
 const DIMS = data.options.dimensions.filter(d=>data.tests.some(t=>t.meta[d]));
@@ -826,17 +842,20 @@ function failuresView(){
       h('td',{class:'t'},t.file.split('/').pop()+(data.projects.length>1?' · '+t.project:'')), h('td',{},[t.meta.priority,t.meta.severity].filter(Boolean).join(' · ')), h('td',{},t.meta.owner||''), h('td',{},t.meta.story||t.meta.issue||''), h('td',{},t.results.length), PREV.length?h('td',{},(()=>{ const si=sinceInfo(t); return si? h('span',{class:'since-txt '+si.kind}, si.kind==='new'?'new':runLabel(si.since)) : h('span',{class:'t'},'–'); })()):null, HRUNS.length>1?h('td',{},dots(t,10)):null, h('td',{class:'t'},ms(t.duration))); })))));
   return grid;
 }
+/** A 4xx/5xx is a failure only when the attempt that made the call failed. In a passing attempt it is the
+ *  answer the test asked for (a 404 after a DELETE, a 401 for a bad token) — shown as "expected", never red. */
+function apiCls(c,r){ const st=c.status||0; return st>=400 ? (r&&r.status==='passed'?'exp':'bad') : st>=300?'warn':'ok'; }
 function apiView(){
-  const calls=[]; for(const t of data.tests) for(const r of t.results) for(const c of r.api) calls.push({c,t,r});
+  const calls=[]; for(const t of data.tests) for(const r of t.results) for(const c of r.api) calls.push({c,t,r,cls:apiCls(c,r)});
   if(!calls.length) return h('div',{class:'card'},h('b',{},'No API calls recorded.'),' Add ',h('code',{},"import 'reporting-labs/auto'"),' to playwright.config.ts and every request.get / request.post / page.request call shows up here with headers, bodies and a cURL command. Calls made with other clients can be recorded with api().');
-  const bad=calls.filter(x=>(x.c.status||0)>=400).length, avg=Math.round(calls.reduce((a,x)=>a+(x.c.duration||0),0)/calls.length), slow=calls.filter(x=>(x.c.duration||0)>1000).length;
-  calls.sort((a,b)=>((b.c.status||0)>=400)-((a.c.status||0)>=400)||(b.c.duration||0)-(a.c.duration||0));
+  const bad=calls.filter(x=>x.cls==='bad').length, expd=calls.filter(x=>x.cls==='exp').length, avg=Math.round(calls.reduce((a,x)=>a+(x.c.duration||0),0)/calls.length), slow=calls.filter(x=>(x.c.duration||0)>1000).length;
+  calls.sort((a,b)=>(b.cls==='bad')-(a.cls==='bad')||(b.c.duration||0)-(a.c.duration||0));
   const byHost=new Map(); for(const x of calls){ try{ const hst=new URL(x.c.url).host; byHost.set(hst,(byHost.get(hst)||0)+1);}catch(e){} }
-  return h('div',{}, h('div',{class:'api-stats'}, h('span',{},h('b',{},calls.length),' calls'), h('span',{class:bad?'bad':''},h('b',{},bad),' failed (4xx/5xx)'), h('span',{},h('b',{},ms(avg)),' avg'), h('span',{},h('b',{},slow),' over 1s'), h('span',{},h('b',{},byHost.size),' host'+(byHost.size===1?'':'s'))),
+  return h('div',{}, h('div',{class:'api-stats'}, h('span',{},h('b',{},calls.length),' calls'), h('span',{class:bad?'bad':'',title:'4xx / 5xx responses in tests that failed'},h('b',{},bad),' failed (4xx/5xx)'), expd?h('span',{class:'exp',title:'4xx / 5xx responses in tests that passed: the answer the test expected, e.g. a 404 after a DELETE'},h('b',{},expd),' expected 4xx/5xx'):null, h('span',{},h('b',{},ms(avg)),' avg'), h('span',{},h('b',{},slow),' over 1s'), h('span',{},h('b',{},byHost.size),' host'+(byHost.size===1?'':'s'))),
     h('div',{class:'card w12'}, h('table',{class:'apitbl'}, h('thead',{}, h('tr',{}, ['Method','URL','Status','Time','Test'].map(x=>h('th',{},x)))),
-      h('tbody',{}, calls.map(({c,t})=>{ const st=c.status||0, cls=st>=400?'bad':st>=300?'warn':'ok'; return h('tr',{onclick:()=>select(t.id)},
+      h('tbody',{}, calls.map(({c,t,cls})=>{ const st=c.status||0; return h('tr',{onclick:()=>select(t.id)},
         h('td',{}, h('span',{class:'m '+c.method.toUpperCase(),style:'font:11px var(--mono);font-weight:600;padding:3px 6px;border-radius:3px;color:#fff;background:'+({GET:'#2A7FBF',POST:'var(--pass)',PUT:'#C77D14',PATCH:'#C77D14',DELETE:'var(--fail)'}[c.method.toUpperCase()]||'var(--ink-3)')},c.method.toUpperCase())),
-        h('td',{class:'u',title:c.url},c.url), h('td',{}, h('span',{class:'sc '+cls,style:'font:12px var(--mono);font-weight:600;color:'+(cls==='bad'?'var(--fail)':cls==='warn'?'var(--flaky-ink)':'var(--pass)')},st||'—')), h('td',{class:'t'},c.duration!=null?ms(c.duration):'—'), h('td',{class:'t',title:t.title},t.title)); })))));
+        h('td',{class:'u',title:c.url},c.url), h('td',{}, h('span',{class:'sc '+cls,style:'font:12px var(--mono);font-weight:600;color:'+(cls==='bad'?'var(--fail)':cls==='warn'?'var(--flaky-ink)':cls==='exp'?'var(--ink-2)':'var(--pass)'),title:cls==='exp'?'The test passed: this is the response it expected':''},st||'—'), cls==='exp'?h('span',{class:'sc-exp'},'expected'):null), h('td',{class:'t'},c.duration!=null?ms(c.duration):'—'), h('td',{class:'t',title:t.title},t.title, data.projects.length>1?h('span',{class:'api-proj'},' · '+t.project):null)); })))));
 }
 function timelineView(){
   const W=data.options.widgets, cards=[];
@@ -852,8 +871,9 @@ function graphsView(){
   return h('div',{class:'view-pad'},
     h('div',{class:'grid graphs-grid'},
       chartCard('outcomes-by-priority', 'Outcomes by priority', 'Stacked pass / fail / flaky / skipped for each priority tier.', chartPriorityOutcome),
+      data.projects.length>1? chartCard('outcomes-by-project', 'Outcomes by project', 'Pass / fail / flaky / skipped and the pass rate for each project (browser, device).', chartProjectOutcome) : null,
       chartCard('failure-categories',   'Failure categories',    'What kinds of failures are hurting the suite.',              chartFailureCategories),
-      chartCard('duration-distribution','Duration distribution', 'How test durations are spread across the run.',              chartDurationHistogram),
+      chartCard('duration-distribution','Duration distribution', 'How the durations of the tests that ran are spread.',          chartDurationHistogram),
       chartCard('trend-by-priority',    'Pass rate trend by priority', 'How each priority tier trends over the last runs.',   chartTrendByPriority),
       chartCard('owner-leaderboard',    'Owner leaderboard',      'Failures and flakes ranked by owner. Add meta({owner:...}) to see this.', chartOwnerLeaderboard),
     ));
@@ -908,6 +928,29 @@ function chartCard(id, title, sub, chartFn){
 }
 
 /* Chart 1: horizontal stacked bar per priority (P0..P4 in order, plus 'no priority') */
+/* Chart 1b: the same stacked bars per Playwright project (chromium, firefox, Microsoft Edge...), with each
+   project's pass rate, so a browser that fails more than the others stands out. */
+function chartProjectOutcome(){
+  if(data.projects.length<2) return null;
+  const outs=['passed','flaky','failed','timedOut','interrupted','skipped'];
+  const colors={passed:'var(--pass)', flaky:'var(--flaky)', failed:'var(--fail)', timedOut:'var(--fail)', interrupted:'var(--fail)', skipped:'var(--skip)'};
+  const rows=data.projects.map(p=>{ const m={}; for(const o of outs) m[o]=0; for(const t of data.tests) if(t.project===p) m[t.outcome]=(m[t.outcome]||0)+1; return {p,m}; }).filter(r=>outs.some(o=>r.m[o]));
+  if(!rows.length) return null;
+  const tot=r=>outs.reduce((a,o)=>a+r.m[o],0), maxN=Math.max(...rows.map(tot));
+  const longest=Math.max(...rows.map(r=>r.p.length));
+  const W=520, rowH=28, gap=10, labW=Math.min(170,Math.max(70,longest*7+10)), barW=W-labW-96;
+  const H=rows.length*(rowH+gap)+30;
+  const parts=rows.map((r,i)=>{
+    const y=i*(rowH+gap)+18, n=tot(r), ran=n-r.m.skipped, rate=ran?Math.round(r.m.passed/ran*100):null, scale=barW/maxN;
+    let x=labW; const segs=[];
+    for(const o of outs){ const w=r.m[o]*scale; if(w<=0) continue; segs.push('<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+rowH+'" fill="'+colors[o]+'" data-outcome="'+o+'"><title>'+gEsc(r.p)+' · '+label[o]+' '+r.m[o]+'</title></rect>'); x+=w; }
+    return '<text x="0" y="'+(y+rowH/2+4)+'" fill="var(--ink)" font-size="12" font-weight="600">'+gEsc(r.p)+'</text>'+segs.join('')+
+      '<text x="'+(labW+barW+8)+'" y="'+(y+rowH/2+4)+'" fill="var(--ink-2)" font-size="12" font-variant-numeric="tabular-nums">'+n+(rate==null?'':' · <tspan fill="'+(rate===100?'var(--pass)':r.m.failed+r.m.timedOut+r.m.interrupted?'var(--fail)':'var(--ink-2)')+'" font-weight="600">'+rate+'%</tspan>')+'</text>';
+  }).join('');
+  const legend=outs.filter(o=>rows.some(r=>r.m[o]>0)).map(o=>'<rect width="10" height="10" fill="'+colors[o]+'"/><text x="14" y="9" fill="var(--ink-2)" font-size="11">'+label[o]+'</text>');
+  const legendSvg='<g transform="translate('+labW+','+(H-2)+')">'+legend.map((g,i)=>'<g transform="translate('+(i*90)+',0)">'+g+'</g>').join('')+'</g>';
+  return h('div',{class:'gchart-body',html:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+(H+18)+'" width="100%">'+parts+legendSvg+'</svg>'});
+}
 function chartPriorityOutcome(){
   const order = ['P0','P1','P2','P3','P4'];
   const outs  = ['passed','flaky','failed','timedOut','interrupted','skipped'];
@@ -962,7 +1005,7 @@ function chartDurationHistogram(){
     {label:'30s+',   min:30000,max:Infinity},
   ];
   const counts = buckets.map(()=>0);
-  for(const t of data.tests){ const d=t.duration||0; for(let i=0;i<buckets.length;i++){ if(d>=buckets[i].min && d<buckets[i].max){ counts[i]++; break; } } }
+  for(const t of data.tests){ if(t.outcome==='skipped') continue; const d=t.duration||0; for(let i=0;i<buckets.length;i++){ if(d>=buckets[i].min && d<buckets[i].max){ counts[i]++; break; } } }
   const maxN = Math.max(1,...counts);
   const W=520, colW=80, gap=16, padL=32, padT=24, padB=36, chartH=180;
   const H = chartH+padT+padB;
@@ -977,7 +1020,7 @@ function chartDurationHistogram(){
 
 /* Chart 4: multi-line — pass rate per priority over the last N history entries */
 function chartTrendByPriority(){
-  const hist = data.history || [];
+  const hist = TREND;
   if(hist.length < 2) return null;
   const orders = ['P0','P1','P2','P3','P4'];
   const seenPri = new Set();
@@ -1129,12 +1172,12 @@ function summary(){
   const hasFail=data.tests.some(t=>isFail(t.outcome)||t.outcome==='flaky');
   if(W.attention && hasFail) g.push(h('div',{class:'card w6 fail-rail'}, h('h2',{},'Needs attention', h('span',{class:'hint'},(failed+s.flaky)+' open · ranked by priority and severity')), attention(8)));
   const clusters=failureClusters(); if(clusters.length) g.push(h('div',{class:'card w6 fail-rail'}, h('h2',{},'Failure clusters', h('span',{class:'hint'},clusters.length+' root cause'+(clusters.length>1?'s':'')+' · '+clusters.reduce((a,c)=>a+c.tests.length,0)+' failures')), clustersView(clusters.slice(0,6)), clusters.length>6?h('div',{class:'attn-foot'}, h('button',{onclick:()=>showView('failures')},'View all '+clusters.length+' clusters →')):null));
-  if(W.dimensions) g.push(h('div',{class:'card w8'}, h('h2',{},'Breakdown', h('span',{class:'hint'},'click a row to filter')), breakdown()));
+  if(W.dimensions) g.push(h('div',{class:'card w8 bd-card'}, h('h2',{},'Breakdown', h('span',{class:'hint'},'click a row to filter')), breakdown()));
   if(W.slowest){ const reg=regressions().length; g.push(h('div',{class:'card'}, h('h2',{},'Slowest tests', reg?h('span',{class:'hint badge'},reg+' got slower'):null), tabbed([['slow','Slowest',slowest],['reg','Got slower'+(reg?' ('+reg+')':''),slowerView]]))); }
   if(W.flaky!==false && HRUNS.length>1) g.push(h('div',{class:'card'}, h('h2',{},'Flakiest tests', h('span',{class:'hint'},'last '+Math.min(10,HRUNS.length)+' runs')), flakiest()));
   if(W.skipped!==false) { const sc=skippedCard(); if(sc) g.push(sc); }
   if(W.environment!==false) { const ec=envCard(); if(ec) g.push(ec); }
-  if(data.history.length>1) g.push(h('div',{class:'card w12'}, h('h2',{},'Trend', h('span',{class:'hint'},'last '+data.history.length+' runs')), trend()));
+  if(data.history.length>1) g.push(h('div',{class:'card w12'}, h('h2',{},'Trend', h('span',{class:'hint'},'last '+TREND.length+' runs'+(SMALL_HIDDEN?' · '+SMALL_HIDDEN+' small run'+(SMALL_HIDDEN>1?'s':'')+' (under '+Math.ceil(MED_SIZE/2)+' tests) not plotted':''))), trend()));
   else if(data.history.length===1) g.push(h('div',{class:'card w12'}, h('h2',{},'Trend', h('span',{class:'hint'},'from the second run')), h('div',{class:'nudge'}, h('b',{},'First run recorded.'),' Run the suite once more and this card shows the pass-rate trend, and every failure gets "new this run" or "failing since #…", last-10-runs dots, a Flakiest tests card and a Got slower tab. History lives in ',h('code',{},data.historyFile||'reporting-labs.history.json'),', commit it or cache it in CI.')));
   const ge=data.globalErrors||[], go=data.globalOutput||[];
   if(ge.length||go.some(x=>x.stream==='err')) g.unshift(h('div',{class:'card w12 fail-rail'}, h('h2',{}, ge.length? ge.length+' error'+(ge.length>1?'s':'')+' outside tests' : 'Output outside tests', h('span',{class:'hint'},'spec files that failed to load, global setup, worker crashes')),
@@ -1148,10 +1191,15 @@ function pill(key,text,n,color,sub,tone,series){
     series? spark(series,color) : null, h('div',{class:'l'},text), h('div',{class:'v'},n), h('div',{class:'d '+(tone||'')},sub||''));
 }
 function initials(name){ return (name||'').split(/[\s\-–—·]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'R'; }
+/* The run this one is compared with: the latest earlier run of a comparable size (a full run is not compared
+   with a one-spec debug run, nor a debug run with the full suite); with a build label, a different build. */
 function prevRun(){
   const H=data.history||[]; if(H.length<2) return null;
-  const cur=H[H.length-1]; for(let i=H.length-2;i>=0;i--){ if(!cur.label||H[i].label!==cur.label) return H[i]; }
-  return H[H.length-2];
+  const cur=H[H.length-1], n=cur.total||0;
+  const comparable=e=> isSmallRun(cur) ? (e.total||0)>=n/2 && (e.total||0)<=n*2 : !isSmallRun(e);
+  let fallback=null;
+  for(let i=H.length-2;i>=0;i--){ if(!comparable(H[i])) continue; if(!cur.label||H[i].label!==cur.label) return H[i]; if(!fallback) fallback=H[i]; }
+  return fallback;
 }
 
 /* ---------- run history per test ---------- */
@@ -1199,7 +1247,7 @@ function slowerView(){
   const rows=regressions().slice(0,6);
   if(!rows.length) return h('div',{class:'ok'},'No test got 2× slower than last run.');
   return h('ul',{class:'slow'}, rows.map(({t,prev,cur,ratio})=>h('li',{}, h('button',{onclick:()=>select(t.id)},
-    h('span',{}, h('span',{class:'t'},t.title), h('span',{class:'bar',style:'--w:'+Math.min(100,Math.round(prev/cur*100))+'%'}, h('i',{style:'background:var(--flaky)'}))),
+    h('span',{}, h('span',{class:'t'},t.title, data.projects.length>1?h('small',{class:'proj-sfx'},' · '+t.project):null), h('span',{class:'bar',style:'--w:'+Math.min(100,Math.round(prev/cur*100))+'%'}, h('i',{style:'background:var(--flaky)'}))),
     h('span',{class:'d'}, h('b',{style:'color:var(--fail)'},'×'+(ratio>=10?Math.round(ratio):ratio.toFixed(1))), ' ', ms(prev)+' → '+ms(cur))))));
 }
 /* sparklines from the whole history (counts, no per-test data needed) */
@@ -1210,7 +1258,7 @@ function spark(series, color, w, h2){
   const pts=series.map((v,i)=>x(i)+','+y(v)).join(' ');
   return h('span',{class:'sp','aria-hidden':'true',html:'<svg viewBox="0 0 '+w+' '+h2+'" width="'+w+'" height="'+h2+'"><polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><circle cx="'+x(n-1)+'" cy="'+y(series[n-1])+'" r="2.2" fill="'+color+'"/></svg>'});
 }
-function hseries(f){ return HIST.slice(-12).map(f); }
+function hseries(f){ return TREND.slice(-12).map(f); }
 /* owner rollup for the Failures view and the copied summary */
 function byOwner(){
   const m=new Map();
@@ -1348,13 +1396,28 @@ function donut(){
   const svg=h('div',{html:'<svg viewBox="0 0 132 132">'+arcs+'<text class="c" x="66" y="64" text-anchor="middle">'+rate+'%</text><text class="cl" x="66" y="80" text-anchor="middle">pass rate</text></svg>'}).firstChild;
   return h('div',{class:'donut'}, svg, h('div',{class:'legend'}, parts.map(([k,n])=>h('button',{onclick:()=>{state.status=k;refresh();showView('tests');}}, h('span',{class:'dot',style:'background:'+colorOf(k)}), h('span',{},label[k]), h('span',{class:'n'},n)))));
 }
+/* Cross-project signal. The same test (file, describe path, title) runs once per project — a browser, a
+   device. Failing in every project it ran in points at the app or the test itself; failing in some projects
+   only points at those browsers. Skipped runs do not count; a flaky pass counts as a pass. */
+var XP=null;   // var: the views are built before this line runs
+function xpKey(t){ return t.file+'::'+t.path.join('/')+'::'+t.title; }
+function xproj(t){
+  if(data.projects.length<2) return null;
+  if(!XP){ XP=new Map(); for(const u of data.tests){ if(u.outcome==='skipped') continue; const g=XP.get(xpKey(u))||[]; g.push(u); XP.set(xpKey(u),g); } }
+  const g=XP.get(xpKey(t))||[]; if(g.length<2) return null;
+  const bad=g.filter(u=>isFail(u.outcome)); if(!bad.length) return null;
+  if(bad.length===g.length) return {all:true, text:g.length===2?'fails on both projects':'fails on all '+g.length+' projects', tip:'The same failure in every project it ran in: look at the app or the test, not the browser'};
+  const names=bad.map(u=>u.project), good=g.filter(u=>!isFail(u.outcome)).map(u=>u.project);
+  return {all:false, text: names.length<=2? 'only on '+names.join(' and ') : 'on '+names.length+' of '+g.length+' projects', tip:'Passes on '+good.join(', ')+': specific to '+names.join(', ')};
+}
+function xpTag(xp,cls){ return h('span',{class:'xp '+(xp.all?'all':'some')+(cls?' '+cls:''),title:xp.tip},xp.text); }
 function attention(limit){
   const bad=data.tests.filter(t=>isFail(t.outcome)||t.outcome==='flaky').sort((a,b)=>rank(a)-rank(b)||(isFail(b.outcome)-isFail(a.outcome))||b.duration-a.duration);
   if(!bad.length) return h('div',{class:'ok'},'No failures. Ship it.');
   const groups=new Map(); for(const t of bad){ const k=t.file+'::'+t.path.join('/')+'::'+t.title; const g=groups.get(k)||{t,projects:[]}; g.projects.push(t.project); groups.set(k,g); }
   const all=[...groups.values()], rows=limit?all.slice(0,limit):all;
   const sub=(t,projects)=>{ const parts=[t.file.split('/').pop()];
-    if(data.projects.length>1) parts.push(projects.length>1? projects.length+' projects' : projects[0]);
+    if(data.projects.length>1){ const xp=xproj(t); parts.push(xp? xpTag(xp) : projects.length>1? projects.length+' projects' : projects[0]); }
     const si=sinceInfo(t); if(si) parts.push(si.kind==='new'? h('b',{class:'new'},'new this run') : 'failing since '+runLabel(si.since));
     const le=t.results[t.results.length-1]&&t.results[t.results.length-1].errors[0]; if(le&&le.explain) parts.push(h('span',{class:'rsn',title:le.explain.summary},le.explain.label));
     else if(t.outcome==='flaky') parts.push('passed on retry '+t.results.length);
@@ -1438,7 +1501,7 @@ function clusterLine(c){
 // in place and "show fewer" folds it again. Each name opens that test.
 function clusterWho(byTitle, all){
   const entries=[...byTitle.entries()], names=all?entries:entries.slice(0,6), extra=entries.length-names.length;
-  const who=names.map(([title,ts])=>h('button',{onclick:()=>select(ts[0].id),title:ts.map(t=>t.project).join(', ')}, h('span',{class:'tri'},'›'), title, data.projects.length>1&&ts.length>1? h('small',{},' ×'+ts.length) : null));
+  const who=names.map(([title,ts])=>h('button',{onclick:()=>select(ts[0].id),title:ts.map(t=>t.project).join(', ')}, h('span',{class:'tri'},'›'), title, data.projects.length>1&&ts.length>1? h('small',{},' ×'+ts.length) : null, (()=>{ const xp=xproj(ts[0]); return xp? h('small',{class:'xp '+(xp.all?'all':'some'),title:xp.tip},' · '+xp.text) : null; })()));
   const swap=(ev,toAll)=>{ const d=ev.currentTarget.closest('.who'); d.replaceChildren(); for(const n of clusterWho(byTitle,toAll)) d.append(n); };
   if(extra>0) who.push(h('button',{class:'ex',onclick:ev=>swap(ev,true),title:'Show all '+entries.length+' tests'},'+'+extra+' more'));
   else if(all&&entries.length>6) who.push(h('button',{class:'ex',onclick:ev=>swap(ev,false)},'show fewer'));
@@ -1452,7 +1515,7 @@ function clustersView(cl){
   }));
 }
 function trend(){
-  const H=data.history, W=760, HT=170, padL=34, padR=12, padT=12, padB=26, n=H.length;
+  const H=TREND, W=760, HT=170, padL=34, padR=12, padT=12, padB=26, n=H.length;
   const x=i=>padL+(n===1?0:i/(n-1))*(W-padL-padR), y=v=>padT+(1-v/100)*(HT-padT-padB);
   const rate=e=>{ const ran=e.total-e.skipped; return ran?Math.round(e.passed/ran*100):0; };
   const failPct=e=>{ const ran=e.total-e.skipped; return ran?Math.round(e.failed/ran*100):0; };
@@ -1462,9 +1525,14 @@ function trend(){
   svg+='<path class="area" d="M'+x(0)+','+y(0)+' '+H.map((e,i)=>'L'+x(i)+','+y(rate(e))).join(' ')+' L'+x(n-1)+','+y(0)+' Z"/>';
   svg+='<polyline class="fail" points="'+H.map((e,i)=>x(i)+','+y(failPct(e))).join(' ')+'"/>';
   svg+='<polyline class="pass" points="'+H.map((e,i)=>x(i)+','+y(rate(e))).join(' ')+'"/>';
-  svg+=H.map((e,i)=>'<circle class="pt'+(i===n-1?' now':'')+'" cx="'+x(i)+'" cy="'+y(rate(e))+'" r="3.5"><title>'+new Date(e.time).toLocaleString()+(e.label?' · '+e.label:'')+' · '+rate(e)+'% pass · '+e.failed+' failed · '+ms(e.duration)+'</title></circle>').join('');
-  const step=Math.max(1,Math.ceil(n/8));
-  svg+=H.map((e,i)=>(i===n-1||(i%step===0&&n-1-i>=step))?'<text x="'+x(i)+'" y="'+(HT-6)+'" text-anchor="'+(i===n-1&&n>1?'end':'middle')+'">'+(e.label||new Date(e.time).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+'</text>':'').join('');
+  svg+=H.map((e,i)=>'<circle class="pt'+(i===n-1&&e===HIST[HIST.length-1]?' now':'')+'" cx="'+x(i)+'" cy="'+y(rate(e))+'" r="3.5"><title>'+new Date(e.time).toLocaleString()+(e.label?' · '+e.label:'')+' · '+rate(e)+'% pass · '+e.failed+' failed · '+ms(e.duration)+'</title></circle>').join('');
+  // Several runs on one day get the time too; longer labels mean fewer of them, so they never overlap
+  const day=e=>new Date(e.time).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  const days=H.filter(e=>!e.label).map(day), twice=days.length!==new Set(days).size;
+  const step=Math.max(1,Math.ceil(n/(twice?5:8)));
+  const shown=H.map((e,i)=>i===n-1||(i%step===0&&n-1-i>=step));
+  const axis=e=> e.label || (twice ? day(e)+' '+new Date(e.time).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}) : day(e));
+  svg+=H.map((e,i)=>shown[i]?'<text x="'+x(i)+'" y="'+(HT-6)+'" text-anchor="'+(i===n-1&&n>1?'end':i===0&&twice?'start':'middle')+'">'+escape(axis(e))+'</text>':'').join('');
   const colW=n>1?(x(1)-x(0)):(W-padL-padR);
   svg+='<line class="guide" x1="0" x2="0" y1="'+padT+'" y2="'+y(0)+'" style="display:none"/>';
   svg+=H.map((e,i)=>'<rect class="hit" data-i="'+i+'" x="'+(x(i)-colW/2)+'" y="0" width="'+colW+'" height="'+HT+'" fill="transparent"/>').join('');
@@ -1489,7 +1557,7 @@ function trend(){
   svgEl.addEventListener('mousemove',ev=>{ const r=ev.target.closest&&ev.target.closest('.hit'); if(!r){ tip.hidden=true; guide.style.display='none'; return; } show(+r.dataset.i,ev); });
   svgEl.addEventListener('mouseleave',()=>{ tip.hidden=true; guide.style.display='none'; });
   wrap.append(
-    h('div',{class:'trend-cap'}, h('span',{style:'color:var(--pass)'},'— pass rate'), h('span',{style:'color:var(--fail)'},'- - fail rate'), h('span',{style:'color:var(--accent)'},'▮ duration'), h('span',{style:'margin-left:auto'}, 'this run: '+rate(H[n-1])+'% · '+ms(H[n-1].duration))));
+    h('div',{class:'trend-cap'}, h('span',{style:'color:var(--pass)'},'— pass rate'), h('span',{style:'color:var(--fail)'},'- - fail rate'), h('span',{style:'color:var(--accent)'},'▮ duration'), h('span',{style:'margin-left:auto'}, 'this run: '+rate(HIST[HIST.length-1])+'% · '+ms(HIST[HIST.length-1].duration)+(isSmallRun(HIST[HIST.length-1])?' · small run, not plotted':''))));
   return wrap;
 }
 function workers(){
@@ -1528,7 +1596,7 @@ function slowest(){
   const top=[...data.tests].filter(t=>t.outcome!=='skipped').sort((a,b)=>b.duration-a.duration).slice(0,5);
   const max=top[0]?top[0].duration:1;
   return h('ul',{class:'slow'}, top.map(t=>h('li',{}, h('button',{onclick:()=>select(t.id)},
-    h('span',{}, h('span',{class:'t'},t.title), h('span',{class:'bar',style:'--w:'+Math.max(4,Math.round(t.duration/max*100))+'%'}, h('i',{}))), h('span',{class:'d'},ms(t.duration))))));
+    h('span',{}, h('span',{class:'t'},t.title, data.projects.length>1?h('small',{class:'proj-sfx'},' · '+t.project):null), h('span',{class:'bar',style:'--w:'+Math.max(4,Math.round(t.duration/max*100))+'%'}, h('i',{}))), h('span',{class:'d'},ms(t.duration))))));
 }
 function projects(){
   return h('div',{class:'proj'}, data.projects.map(p=>{
@@ -1632,7 +1700,7 @@ function renderDetail(t, d, retryIdx){
       h('button',{class:'btn',onclick:e=>copyText(location.href.split('#')[0]+'#t='+t.id,e.currentTarget,'Link copied')},'Copy link'),
       (()=>{ const r=t.results[t.results.length-1]; const e=r&&r.errors[0]; return e? [h('button',{class:'btn',onclick:ev=>copyText(t.title+'\n'+t.file+':'+t.line+'\n\n'+e.message,ev.currentTarget,'Error copied')},'Copy error'), h('button',{class:'btn primary',onclick:()=>openBugReport(t)},'Bug report')] : null; })(),
       editorLink(t))),
-    h('div',{class:'badges'}, h('span',{class:'badge '+t.outcome},label[t.outcome]), t.expectedFailure? h('span',{class:'badge xfail',title:'Marked test.fail(): failing is the expected result'},'Expected failure') : null, sinceBadge(t), dots(t,10), data.bdd?h('span',{class:'badge scenario'},'Scenario'):null, t.tags.map(g=>h('span',{class:'badge tag'},g)), data.projects.length>1?h('span',{class:'badge tag'},t.project):null, h('span',{class:'loc'}, t.file+':'+t.line+' · '+ms(t.duration)+(t.outcome==='timedOut'&&t.timeout?' · timeout '+ms(t.timeout):'')+(t.retries?' · retries '+t.retries:''))));
+    h('div',{class:'badges'}, h('span',{class:'badge '+t.outcome},label[t.outcome]), t.expectedFailure? h('span',{class:'badge xfail',title:'Marked test.fail(): failing is the expected result'},'Expected failure') : null, sinceBadge(t), dots(t,10), data.bdd?h('span',{class:'badge scenario'},'Scenario'):null, t.tags.map(g=>h('span',{class:'badge tag'},g)), data.projects.length>1?h('span',{class:'badge tag'},t.project):null, (()=>{ const xp=isFail(t.outcome)&&xproj(t); return xp? xpTag(xp,'badge') : null; })(), h('span',{class:'loc'}, t.file+':'+t.line+' · '+ms(t.duration)+(t.outcome==='timedOut'&&t.timeout?' · timeout '+ms(t.timeout):'')+(t.retries?' · retries '+t.retries:''))));
   const metaKeys=Object.keys(t.meta);
   const linkFor=(k,v)=>{ if(t.links&&t.links[k]) return t.links[k]; const tpl=data.options.links[k]||data.options.links['*']; if(tpl) return tpl.replace('{id}',encodeURIComponent(v)); if(/^https?:\/\//.test(v)) return v; return null; };
   if(metaKeys.length) d.append(h('div',{class:'metas'}, metaKeys.map(k=>{ const v=t.meta[k], low=/^(P[3-4]|low|minor|trivial|normal|medium)$/i.test(v); const parts=(t.links&&t.links[k])||!data.options.links[k]&&!data.options.links['*']?[v]:v.split(/,\s+/); const nodes=[]; parts.forEach((part,i)=>{ const href=linkFor(k,part); if(i) nodes.push(', '); nodes.push(href? h('a',{href,target:'_blank',rel:'noopener'},part) : h('span',{class:'v'},part)); }); return h('span',{class:'meta '+k+(low?' low':'')}, h('span',{class:'k'},k), ...nodes); })));
@@ -1648,7 +1716,7 @@ function renderDetail(t, d, retryIdx){
   if(r.steps.length){ const stepTotal=Math.max(1, r.duration||0, r.steps.reduce((a,x)=>a+x.duration,0)); body.append(h('h4',{},data.bdd?'Scenario steps':'Steps', h('span',{class:'hint'},'bar = share of '+ms(stepTotal))), stepTree(r.steps, stepTotal)); }
   if(r.logs.length){ const t0=r.startTime; body.append(h('h4',{},'Log'), h('div',{class:'logs'}, r.logs.map(l=>h('div',{class:'ln'+(/\b(error|fail|exception)\b/i.test(l.msg)?' err':/\bwarn/i.test(l.msg)?' warn':'')}, h('span',{class:'ts'},'+'+ms(Math.max(0,l.t-t0))), h('span',{class:'lm'},l.msg))))); }
   for(const b of r.data){ body.append(h('h4',{},b.name), dataBlock(b)); }
-  if(r.api.length){ body.append(h('h4',{},r.api.length+' API call'+(r.api.length>1?'s':'')), ...r.api.map(apiPanel)); body.append(h('div',{class:'mask-note'},'Secrets and auth headers are masked as ****')); }
+  if(r.api.length){ body.append(h('h4',{},r.api.length+' API call'+(r.api.length>1?'s':'')), ...r.api.map(c=>apiPanel(c,r))); body.append(h('div',{class:'mask-note'},'Secrets and auth headers are masked as ****')); }
   const imgs=r.attachments.filter(a=>a.src&&a.contentType.startsWith('image/'));
   const vids=r.attachments.filter(a=>a.src&&a.contentType.startsWith('video/'));
   const traces=r.attachments.filter(a=>a.src&&(a.name==='trace'||/\.zip$/.test(a.src)));
@@ -1693,10 +1761,10 @@ function dataBlock(b){
   if(b.kind==='kv') return h('dl',{class:'kv2'}, b.kv.map(([k,v])=>[h('dt',{},k),h('dd',{class:v==='****'?'mask':''},v)]));
   return h('pre',{class:'txt'},b.text);
 }
-function apiPanel(c){
-  const st=c.status||0, cls=st>=500||st>=400?'bad':st>=300?'warn':'ok';
+function apiPanel(c,r){
+  const st=c.status||0, cls=apiCls(c,r);
   const wrap=h('div',{class:'api collapsed'});
-  const head=h('button',{class:'api-head',onclick:()=>wrap.classList.toggle('collapsed')}, h('span',{class:'m '+c.method.toUpperCase()},c.method.toUpperCase()), h('span',{class:'u',title:c.url},c.url), st?h('span',{class:'sc '+cls},st):null, c.duration!=null?h('span',{class:'d'},ms(c.duration)):null);
+  const head=h('button',{class:'api-head',onclick:()=>wrap.classList.toggle('collapsed')}, h('span',{class:'m '+c.method.toUpperCase()},c.method.toUpperCase()), h('span',{class:'u',title:c.url},c.url), st?h('span',{class:'sc '+cls,title:cls==='exp'?'The test passed: this is the response it expected':''},st):null, cls==='exp'?h('span',{class:'sc-exp'},'expected'):null, c.duration!=null?h('span',{class:'d'},ms(c.duration)):null);
   const pre=v=>v==null?null:h('pre',{}, typeof v==='string'?v:JSON.stringify(v,null,2));
   const col=(title,headers,bodyv)=>h('div',{class:'api-col'}, h('h5',{},title), headers&&Object.keys(headers).length? [h('h5',{},'Headers'), pre(headers)] : null, bodyv!=null? [h('h5',{},'Body'), pre(bodyv)] : h('div',{style:'font-size:12px;color:var(--ink-3)'},'no body'));
   const tools=h('div',{class:'api-tools'}, h('button',{class:'btn',onclick:e=>copyText(curlOf(c),e.currentTarget,'Copied')},'Copy as cURL'), h('button',{class:'btn',onclick:e=>copyText(c.url,e.currentTarget,'Copied')},'Copy URL'));

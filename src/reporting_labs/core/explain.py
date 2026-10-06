@@ -24,6 +24,7 @@ LABELS = {
     "test-timeout": "Test timed out",
     "hook-timeout": "Hook timed out",
     "closed": "Browser closed early",
+    "crashed": "Browser crashed",
     "script": "Error in test code",
     "file": "File not found",
     "thrown": "Test threw an error",
@@ -79,6 +80,9 @@ def explain(message: str, exc_type: Optional[str] = None) -> Optional[Dict[str, 
         if inner:
             return inner
 
+    # The browser process died (memory, too many workers): infrastructure, not the app or the test
+    if re.search(r"Target crashed|Page crashed|page has crashed|Renderer process crashed|tab crashed|session deleted because of page crash|chrome not reachable|Browsing context has been discarded", msg, re.I):
+        return _out("crashed", "The browser crashed while the test was running.", "Not a bug in the app or the test: the browser process died, usually from memory pressure or too many parallel workers. Re-run it; if it keeps happening, lower workers or give the machine more memory.")
     out = _playwright(msg, first) or _selenium(msg, first, t) or _robot(msg, first, t) or _http(msg, first, t) or _assertion(msg, first, t) or _python(msg, first, t)
     return out or _out("thrown", short(first), "See the full message and stack trace below.")
 
