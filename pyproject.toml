@@ -44,7 +44,7 @@ version = { attr = "reporting_labs._version.__version__" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-reporting_labs = ["template.html", "py.typed"]
+reporting_labs = ["template.html", "py.typed", "snippets.code-snippets"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

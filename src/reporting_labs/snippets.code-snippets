@@ -1,0 +1,78 @@
+{
+  "reportingLabs: meta comment": {
+    "scope": "javascript,typescript,javascriptreact,typescriptreact",
+    "prefix": ["rlmeta", "/**rl"],
+    "description": "reportingLabs meta as a comment above a test or describe",
+    "body": [
+      "/**",
+      " * @priority ${1|P0,P1,P2,P3,P4|}  @owner ${2:name}  @feature ${3:area}",
+      " * @story ${4:SHOP-123}",
+      " */"
+    ]
+  },
+  "reportingLabs: Playwright test with meta": {
+    "scope": "javascript,typescript,javascriptreact,typescriptreact",
+    "prefix": "rltest",
+    "description": "A Playwright test with reportingLabs meta in a comment",
+    "body": [
+      "/**",
+      " * @priority ${1|P0,P1,P2,P3,P4|}  @owner ${2:name}  @feature ${3:area}",
+      " * @story ${4:SHOP-123}",
+      " */",
+      "test('${5:does something}', async ({ page }) => {",
+      "\t$0",
+      "});"
+    ]
+  },
+  "reportingLabs: WebdriverIO it() with meta": {
+    "scope": "javascript,typescript",
+    "prefix": "rlit",
+    "description": "A WebdriverIO / Mocha test with reportingLabs meta in a comment",
+    "body": [
+      "/**",
+      " * @priority ${1|P0,P1,P2,P3,P4|}  @owner ${2:name}  @feature ${3:area}",
+      " * @story ${4:SHOP-123}",
+      " */",
+      "it('${5:does something}', async () => {",
+      "\t$0",
+      "});"
+    ]
+  },
+  "reportingLabs: describe with meta": {
+    "scope": "javascript,typescript,javascriptreact,typescriptreact",
+    "prefix": "rldescribe",
+    "description": "A describe block whose meta applies to every test inside",
+    "body": [
+      "/** @owner ${1:name}  @feature ${2:area} */",
+      "${3|test.describe,describe|}('${4:Feature}', () => {",
+      "\t$0",
+      "});"
+    ]
+  },
+  "reportingLabs: meta in a docstring": {
+    "scope": "python",
+    "prefix": "rlmeta",
+    "description": "reportingLabs meta in a test docstring",
+    "body": [
+      "\"\"\"${1:What this test checks}.",
+      "",
+      "@priority ${2|P0,P1,P2,P3,P4|}  @owner ${3:name}  @feature ${4:area}",
+      "@story ${5:SHOP-123}",
+      "\"\"\""
+    ]
+  },
+  "reportingLabs: pytest test with meta": {
+    "scope": "python",
+    "prefix": "rltest",
+    "description": "A pytest test with reportingLabs meta in its docstring",
+    "body": [
+      "def test_${1:does_something}(${2:page}):",
+      "\t\"\"\"${3:What this test checks}.",
+      "",
+      "\t@priority ${4|P0,P1,P2,P3,P4|}  @owner ${5:name}  @feature ${6:area}",
+      "\t@story ${7:SHOP-123}",
+      "\t\"\"\"",
+      "\t$0"
+    ]
+  }
+}
