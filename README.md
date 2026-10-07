@@ -98,6 +98,26 @@ def test_checkout(page):
 
 For PyCharm, see [Install the editor snippets](https://reportinglabs.dev/features/meta-comments#install-the-editor-snippets).
 
+## pytest-bdd
+
+Using pytest-bdd (Gherkin `.feature` files)? Nothing to set up: when pytest-bdd is installed, every scenario reads
+like a Cucumber report.
+
+- **One row per scenario**, named after it, at its `.feature` file and line, grouped under the feature file.
+  A Scenario Outline example is named `Scenario (value1, value2)` and shows its Examples row as a data block.
+- **Every Gherkin step** (Background included) as a step: `Given …`, `When …`, `Then …`, with its time. Playwright and
+  Selenium actions of a step nest under it.
+- **The failing step** carries the error; the steps after it show as *not run*. A step that calls `pytest.skip()`
+  skips the scenario, and its remaining steps show as *not run* too.
+- **An undefined step** fails the scenario at its `.feature` line, with the lines around it and the step definition
+  to write.
+- **Data tables and doc strings** of a step become data blocks.
+- **Tags:** `@P1` and `@critical` set priority and severity, `@owner:asha` sets the owner, anything else is a tag.
+  `meta()` inside a step wins over a tag.
+- **The browser** the steps used (pytest-playwright) is the project.
+
+Works with pytest-bdd 6 to 9 (data tables and doc strings need pytest-bdd 8+).
+
 ## Playwright
 
 Install `pytest-playwright` and write tests as usual. Every action, every `expect()` and a screenshot of the

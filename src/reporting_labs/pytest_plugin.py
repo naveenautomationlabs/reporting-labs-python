@@ -61,6 +61,12 @@ def pytest_configure(config: pytest.Config) -> None:
     project = config.getoption("--rl-project") or config.getini("reporting_labs_project") or ""
     config._rl_opts = opts  # type: ignore[attr-defined]
     config.pluginmanager.register(Runtime(opts), "reporting_labs_runtime")
+    try:
+        from . import bdd_support
+        if bdd_support.installed():
+            config.pluginmanager.register(bdd_support.BddHooks(), "reporting_labs_bdd")
+    except Exception:
+        pass
     if opts.get("captureApi") is not False:
         from .capture import http
         http.install(int(opts.get("apiMaxBody") or 64 * 1024))
@@ -136,6 +142,9 @@ class Runtime:
                     err.location = {"file": str(Path(str(item.config.rootpath)) / str(loc[0])), "line": int(loc[1]) + 1, "column": 0}
             if report.longreprtext:
                 err.message = _first_block(report.longreprtext, err.message)
+            if getattr(item, "_rl_bdd", None) is not None:
+                from . import bdd_support
+                bdd_support.adjust_error(item, err, exc)
             attempt.add_error(err)
             _on_failure(item, attempt, exc)
         if call.when == "teardown":
@@ -243,7 +252,15 @@ def _item_info(item: pytest.Item) -> Dict[str, Any]:
                 tags.append(tag)
     except Exception:
         pass
-    return {"tags": tags, "project": project, "timeout": timeout, "file": str(getattr(item, "fspath", "") or getattr(item, "path", ""))}
+    info: Dict[str, Any] = {"tags": tags, "project": project, "timeout": timeout, "file": str(getattr(item, "fspath", "") or getattr(item, "path", ""))}
+    try:
+        from . import bdd_support
+        bdd = bdd_support.item_info(item)   # pytest-bdd: the scenario's name, .feature file and line
+        if bdd:
+            info["bdd"] = bdd
+    except Exception:
+        pass
+    return info
 
 
 # ── runs in the main process only ──────────────────────────────────────────────────────────────────
@@ -308,7 +325,31 @@ class Controller:
         if project in BROWSER_PARAMS:
             title = re.sub(r"\[" + re.escape(project) + r"\]$", "", title) or title
             title = re.sub(r"\[" + re.escape(project) + r"-", "[", title)
-        return self.run.test(nodeid, title, path, file, line, project, tags=info.get("tags"), timeout=info.get("timeout"))
+        bdd = info.get("bdd")
+        tags = info.get("tags")
+        if bdd and tags:
+            # Like the Cucumber JVM plugin: @P1, @critical and @owner:asha become meta, not also tag chips
+            meta, rest = _tag_meta(tags, self.opts.meta_keys())
+            tags = rest
+            t0 = self.run.tests.get(nodeid)
+            if t0 is None or not t0.meta:
+                info = {**info, "_tag_meta": meta}
+        if bdd:
+            # pytest-bdd: the row is the scenario, at its .feature file and line, under the feature file's name
+            title = bdd.get("title") or title
+            file = bdd.get("file") or file
+            line = bdd.get("line") or line
+            path = bdd.get("path") or path
+            if bdd.get("project") and not info.get("project") and not self.project:
+                project = bdd["project"]    # known once the scenario ran: the teardown report updates the row
+                t = self.run.tests.get(nodeid)
+                if t is not None:
+                    t.project = project
+        t = self.run.test(nodeid, title, path, file, line, project, tags=tags, timeout=info.get("timeout"))
+        if info.get("_tag_meta"):
+            for k, v in info["_tag_meta"].items():
+                t.meta.setdefault(k, v)
+        return t
 
     def _browser_from_title(self, title: str) -> str:
         m = re.search(r"\[([^\]]+)\]$", title)
@@ -429,6 +470,24 @@ class Controller:
         terminalreporter.write_line("")
         for line in self.lines:
             terminalreporter.write_line(line)
+
+
+def _tag_meta(tags: List[str], keys: List[str]):
+    """Split Gherkin tags the way the Cucumber JVM plugin does: priority, severity and key:value meta vs real tags."""
+    meta: Dict[str, str] = {}
+    rest: List[str] = []
+    for raw in tags:
+        tag = str(raw).lstrip("@")
+        m = re.match(r"^([A-Za-z_-]+)[:=](.+)$", tag)
+        if m and m.group(1).lower() in keys:
+            meta.setdefault(m.group(1).lower(), m.group(2))
+        elif re.match(r"^P[0-4]$", tag, re.I) and "priority" in keys:
+            meta.setdefault("priority", tag.upper())
+        elif re.match(r"^(blocker|critical|major|normal|minor|trivial)$", tag, re.I) and "severity" in keys:
+            meta.setdefault("severity", tag.lower())
+        else:
+            rest.append(raw)
+    return meta, rest
 
 
 def _skip_reason(report: pytest.TestReport) -> Optional[str]:
