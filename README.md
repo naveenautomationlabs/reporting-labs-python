@@ -100,8 +100,8 @@ For PyCharm, see [Install the editor snippets](https://reportinglabs.dev/feature
 
 ## pytest-bdd
 
-Using pytest-bdd (Gherkin `.feature` files)? Nothing to set up: when pytest-bdd is installed, every scenario reads
-like a Cucumber report.
+Using pytest-bdd (Gherkin `.feature` files)? Nothing to set up (reporting-labs 0.1.7+): when pytest-bdd is installed,
+every scenario reads like a Cucumber report.
 
 - **One row per scenario**, named after it, at its `.feature` file and line, grouped under the feature file.
   A Scenario Outline example is named `Scenario (value1, value2)` and shows its Examples row as a data block.
