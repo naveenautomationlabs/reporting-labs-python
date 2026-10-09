@@ -1648,7 +1648,8 @@ function visible(){
     return true;
   });
 }
-function refresh(){
+// keepSelection: only select() passes it, so a test picked on purpose (Failures, API) stays shown
+function refresh(keepSelection){
   document.querySelectorAll('.pill').forEach(p=>p.setAttribute('aria-pressed',p.dataset.k===state.status));
   document.querySelectorAll('.dim .row').forEach(r=>{ const card=r.closest('.card'); const d=card.querySelector('h2').textContent.replace(/^By /,''); r.setAttribute('aria-pressed', state.dims[d]===r.querySelector('.k').textContent); });
   document.querySelectorAll('select[data-dim]').forEach(sel=>{ sel.value=state.dims[sel.dataset.dim]||''; });
@@ -1656,6 +1657,8 @@ function refresh(){
   const ss=$('#statussel'); if(ss) ss.value=state.status;
   const vis=visible(), ids=new Set(vis.map(t=>t.id));
   document.querySelectorAll('.cell').forEach(c=>c.classList.toggle('dim',!ids.has(c.dataset.id)));
+  // a filter hid the selected test: show one that is in the list (select() re-renders it)
+  if(vis.length&&!keepSelection&&!ids.has(state.selected)) return select(firstInteresting(vis), state.view!=='tests');
   const box=$('#items'); box.innerHTML='';
   if(!vis.length){ box.append(h('div',{class:'empty'},'No tests match. Clear the search or pick another filter.')); return; }
   document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.g===state.group));
@@ -1698,12 +1701,12 @@ function refresh(){
     for(const el of render(root,'',0)) box.append(el);
   }
 }
-function firstInteresting(){ const f=data.tests.find(t=>isFail(t.outcome))||data.tests.find(t=>t.outcome==='flaky')||data.tests[0]; return f&&f.id; }
+function firstInteresting(ts=data.tests){ const f=ts.find(t=>isFail(t.outcome))||ts.find(t=>t.outcome==='flaky')||ts[0]; return f&&f.id; }
 
 /* ---------- detail ---------- */
 function select(id, quiet){
   const t=data.tests.find(x=>x.id===id); if(!t) return;
-  state.selected=id; state.retry=t.results.length-1; if(!quiet){ if(state.view!=='tests') showView('tests'); else setHash(); } refresh(); renderDetail(t);
+  state.selected=id; state.retry=t.results.length-1; if(!quiet){ if(state.view!=='tests') showView('tests'); else setHash(); } refresh(true); renderDetail(t);
   const it=document.querySelector('.item[data-id="'+id+'"]'); if(it&&it.scrollIntoView) it.scrollIntoView({block:'nearest'});
 }
 function renderDetail(t, d, retryIdx){
