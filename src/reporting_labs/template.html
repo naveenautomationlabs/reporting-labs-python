@@ -229,6 +229,9 @@ a{color:var(--accent)}
 .step.skip .t,.step.skip .kw,.step.skip .d{color:var(--ink-3);font-style:italic}
 .step .e{font:12px var(--mono);color:var(--fail);padding:2px 0 6px 28px;white-space:pre-wrap}
 li.collapsed>ul{display:none}
+.st-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap} .detail .st-h .hint{margin-left:0} .st-h .st-tools{margin-left:auto;display:inline-flex;gap:12px;text-transform:none;letter-spacing:0}
+.st-tools button{background:none;border:0;padding:0;font:500 12px var(--sans);color:var(--accent);cursor:pointer} .st-tools button:hover{text-decoration:underline}
+@media print{.st-tools{display:none}}
 .att{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
 .att figure{margin:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--surface-2)}
 .att img{width:100%;display:block;aspect-ratio:16/10;object-fit:cover;cursor:zoom-in}
@@ -1724,7 +1727,9 @@ function renderDetail(t, d, retryIdx){
   const body=h('div',{});
   if(t.note&&retry===t.results.length-1) body.append(h('div',{class:'note '+(t.outcome==='passed'?'ok':'warn')}, t.note));
   if(r.errors.length){ body.append(h('h4',{},r.errors.length>1?'Errors':'Error'), ...r.errors.map(errorView)); }
-  if(r.steps.length){ const stepTotal=Math.max(1, r.duration||0, r.steps.reduce((a,x)=>a+x.duration,0)); body.append(h('h4',{},data.bdd?'Scenario steps':'Steps', h('span',{class:'hint'},'bar = share of '+ms(stepTotal))), stepTree(r.steps, stepTotal)); }
+  if(r.steps.length){ const stepTotal=Math.max(1, r.duration||0, r.steps.reduce((a,x)=>a+x.duration,0)); const tree=stepTree(r.steps, stepTotal), nested=r.steps.some(x=>x.steps.length);
+    body.append(h('h4',{class:'st-h'},data.bdd?'Scenario steps':'Steps', h('span',{class:'hint'},'bar = share of '+ms(stepTotal)),
+      nested? h('span',{class:'st-tools'}, h('button',{type:'button',onclick:()=>setSteps(tree,false)},'Expand all'), h('button',{type:'button',onclick:()=>setSteps(tree,true)},'Collapse all')) : null), tree); }
   if(r.logs.length){ const t0=r.startTime; body.append(h('h4',{},'Log'), h('div',{class:'logs'}, r.logs.map(l=>h('div',{class:'ln'+(/\b(error|fail|exception)\b/i.test(l.msg)?' err':/\bwarn/i.test(l.msg)?' warn':'')}, h('span',{class:'ts'},'+'+ms(Math.max(0,l.t-t0))), h('span',{class:'lm'},l.msg))))); }
   for(const b of r.data){ body.append(h('h4',{},b.name), dataBlock(b)); }
   if(r.api.length){ body.append(h('h4',{},r.api.length+' API call'+(r.api.length>1?'s':'')), ...r.api.map(c=>apiPanel(c,r))); body.append(h('div',{class:'mask-note'},'Secrets and auth headers are masked as ****')); }
@@ -1757,7 +1762,8 @@ function renderDetail(t, d, retryIdx){
 function stepTree(steps, total){
   return h('ul',{class:'steps'}, steps.map(s=>{
     const bad=!!s.error, skip=s.status==='skipped', kids=s.steps.length>0, pct=total?Math.min(100,s.duration/total*100):0;
-    const li=h('li',{class:kids&&!hasError(s)?'collapsed':''});
+    // a step with sub-steps starts collapsed; the path to a failure starts open unless expandFailedSteps is false
+    const li=h('li',{class:kids&&(data.options.expandFailedSteps===false||!hasError(s))?'collapsed':''});
     const row=h('div',{class:'step'+(bad?' bad':'')+(skip?' skip':'')},
       h('span',{class:'tw'}, kids? '▸' : ''), data.bdd?null:h('span',{class:'cat'},s.category), gherkin(s.title), total&&!skip? h('span',{class:'tb',title:Math.round(pct)+'% of the test'}, h('i',{class:pct>=30?'slow':'',style:'width:'+Math.max(pct,s.duration>0?1.5:0)+'%'})) : null, h('span',{class:'d'},skip?'not run':ms(s.duration)));
     if(kids){ row.style.cursor='pointer'; row.addEventListener('click',()=>{li.classList.toggle('collapsed'); row.querySelector('.tw').textContent=li.classList.contains('collapsed')?'▸':'▾';}); if(!li.classList.contains('collapsed')) row.querySelector('.tw').textContent='▾'; }
@@ -1767,6 +1773,7 @@ function stepTree(steps, total){
 }
 function gherkin(title){ const m=data.bdd&&title.match(/^(Given|When|Then|And|But)\b\s*(.*)$/); if(!m) return h('span',{class:'t',title},title); return h('span',{class:'t',title}, h('span',{class:'kw'+(/^(And|But)$/.test(m[1])?' and':'')},m[1]), m[2]); }
 function hasError(s){ return !!s.error || s.steps.some(hasError); }
+function setSteps(tree, collapsed){ for(const li of tree.querySelectorAll('li')){ const tw=li.querySelector(':scope>.step>.tw'); if(!tw||!tw.textContent) continue; li.classList.toggle('collapsed',collapsed); tw.textContent=collapsed?'▸':'▾'; } }
 function dataBlock(b){
   if(b.kind==='table') return h('div',{}, h('div',{class:'tbl-wrap'}, h('table',{class:'tbl'}, h('thead',{}, h('tr',{}, b.columns.map(c=>h('th',{},c)))), h('tbody',{}, b.rows.map(r=>h('tr',{}, r.map(c=>h('td',{class:c==='****'?'mask':'',title:c},c))))))), h('div',{class:'mask-note'}, b.rows.length+' rows · sensitive columns masked'));
   if(b.kind==='kv') return h('dl',{class:'kv2'}, b.kv.map(([k,v])=>[h('dt',{},k),h('dd',{class:v==='****'?'mask':''},v)]));

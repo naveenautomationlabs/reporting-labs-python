@@ -61,3 +61,12 @@ def test_ci_metadata_no_build_chip(tmp_path):
     assert opts["metadata"]["commit"] == "0123456"
     assert opts["metadata"]["ci"] == "github-actions"
     assert "build" not in opts["metadata"]   # the run number labels the trend, it is not a chip
+
+
+def test_expand_failed_steps(tmp_path):
+    opts = options_mod.load(tmp_path, environ={})
+    assert opts.report_options(None, False)["expandFailedSteps"] is True              # default: the failure path opens
+    (tmp_path / "reporting-labs.config.json").write_text(json.dumps({"expand_failed_steps": False}))
+    assert options_mod.load(tmp_path, environ={}).report_options(None, False)["expandFailedSteps"] is False
+    (tmp_path / "reporting-labs.config.json").write_text(json.dumps({"expandFailedSteps": "false"}))   # Robot listener argument
+    assert options_mod.load(tmp_path, environ={}).report_options(None, False)["expandFailedSteps"] is False

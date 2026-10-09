@@ -193,6 +193,7 @@ All options:
 | `theme` | `"auto"` | `"light"`, `"dark"` or follow the OS |
 | `customCss` | `""` | CSS appended to the report |
 | `editorLinks` | on locally, off in CI | "Open in VS Code" links |
+| `expandFailedSteps` | `true` | Open the steps that lead to a failure. `false`: every step with sub-steps starts collapsed (also on failures); **Expand all / Collapse all** above the steps either way |
 | `bdd` | auto | Style Given / When / Then steps as Gherkin |
 | `outputFolder` | `"reporting-labs"` | Where the report goes |
 | `outputFile` | `"index.html"` | Report file name |

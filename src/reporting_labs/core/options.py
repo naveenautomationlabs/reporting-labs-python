@@ -51,6 +51,7 @@ DEFAULTS: Dict[str, Any] = {
     "history": {"enabled": True, "file": "reporting-labs.history.json", "keep": 30},
     "env": {},
     "editorLinks": None,
+    "expandFailedSteps": True,   # open the steps leading to a failure; False = every step with sub-steps starts collapsed
     "bdd": None,
     # Python-only
     "captureApi": True,          # record requests / httpx calls
@@ -184,6 +185,8 @@ class Options:
             "sections": list(v.get("sections") or []), "widgets": widgets, "dimensions": self.dimensions(), "dimensionOrder": order,
             "links": self.link_urls(), "customCss": v.get("customCss") or "",
             "editorLinks": editor_links_default if v.get("editorLinks") is None else bool(v.get("editorLinks")),
+            # "false" as text too: a Robot listener argument (expandFailedSteps=false) arrives as a string
+            "expandFailedSteps": str(v.get("expandFailedSteps")).strip().lower() not in ("false", "0", "no", "off"),
         }
         if logo:
             out["logo"] = logo
