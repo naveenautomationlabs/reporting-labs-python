@@ -1712,7 +1712,7 @@ function select(id, quiet){
 function renderDetail(t, d, retryIdx){
   d=d||$('#detail'); d.innerHTML='';
   const retry = retryIdx==null ? state.retry : retryIdx;
-  d.append(h('div',{class:'crumb'}, [t.file, ...t.path.map(p=>data.bdd&&!/^Feature:/i.test(p)?'Feature: '+p:p)].map(p=>h('span',{},p))),
+  d.append(h('div',{class:'crumb'}, [t.file, ...t.path.map(p=>data.bdd&&!/^(Feature|Rule):/i.test(p)?'Feature: '+p:p)].map(p=>h('span',{},p))),
     h('div',{class:'titlebar'}, h('h3',{},t.title), h('div',{class:'actions'},
       h('button',{class:'btn',onclick:e=>copyText(location.href.split('#')[0]+'#t='+t.id,e.currentTarget,'Link copied')},'Copy link'),
       (()=>{ const r=t.results[t.results.length-1]; const e=r&&r.errors[0]; return e? [h('button',{class:'btn',onclick:ev=>copyText(t.title+'\n'+t.file+':'+t.line+'\n\n'+e.message,ev.currentTarget,'Error copied')},'Copy error'), h('button',{class:'btn primary',onclick:()=>openBugReport(t)},'Bug report')] : null; })(),
