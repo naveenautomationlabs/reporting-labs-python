@@ -54,6 +54,21 @@ def luhn(s: str) -> bool:
 NOT_A_VALUE = {"bearer", "basic", "digest", "token", "undefined", "redacted", "hidden", "secret", "password"}
 
 # Words after "password is ..." that are plainly not a secret.
+# In source code (error snippets, tracebacks) a key is followed by code, not by its value: `token = await login()`,
+# `password = os.environ["PASSWORD"]`, `secret = None`. Masking these would also teach the masker "await" or "None"
+# and blank it across the whole report. Same rule as the Node.js and Java maskers.
+_CODE_WORDS = {"await", "async", "new", "this", "self", "null", "undefined", "none", "nil", "true", "false", "function",
+               "return", "typeof", "require", "import", "yield", "const", "let", "var"}
+_CODE_REF = re.compile(r"^`?\$\{|^`?(Bearer|Basic|Digest|Token)$|^(process\.env|import\.meta\.env|os\.environ|os\.getenv|System\.getenv|ENV)\b", re.I)
+# PWD / OLDPWD are the shell's current folder ("pwd" is also a password key): learning them would blank the
+# project path in every traceback and editor link
+_NOT_SECRET_ENV = {"PWD", "OLDPWD"}
+
+
+def _is_code_ref(value: str) -> bool:
+    return value.lower() in _CODE_WORDS or bool(_CODE_REF.search(value))
+
+
 NOT_A_SECRET = {
     "valid", "invalid", "visible", "hidden", "required", "optional", "missing", "empty", "null", "undefined", "none",
     "correct", "incorrect", "wrong", "right", "expired", "set", "unset", "not", "present", "absent", "ok", "true", "false",
@@ -100,7 +115,7 @@ class Masker:
             # ones that end up in log lines. Short values are skipped so a plain word is not blanked everywhere.
             try:
                 for k, v in (environ if environ is not None else os.environ).items():
-                    if self.is_sensitive(k):
+                    if self.is_sensitive(k) and k.upper() not in _NOT_SECRET_ENV:
                         self.learn(v, 6)
             except Exception:
                 pass
@@ -181,6 +196,8 @@ class Masker:
             return m.group(1) + m.group(2) + MASK
 
         def kv(m):
+            if _is_code_ref(m.group(6)):
+                return m.group(0)
             self.learn(m.group(6))
             return m.group(1) + m.group(2) + m.group(3) + m.group(4) + m.group(5) + MASK
 
@@ -192,7 +209,7 @@ class Masker:
         def spoken(m):
             key, between, value = m.group(1), m.group(2), m.group(3)
             word = _WORD.sub("", value.lower())
-            if word in NOT_A_SECRET or "*" in value:
+            if word in NOT_A_SECRET or "*" in value or _is_code_ref(value):
                 return m.group(0)
             explicit = bool(re.search(r"\b(is|was|of|as)\b|['\"]$|[:=]\s*$", between))
             if explicit or self._looks_secret(value):
@@ -205,7 +222,7 @@ class Masker:
         def value_then_key(m):
             value, rest = m.group(1), m.group(2)
             word = _WORD.sub("", value.lower())
-            if word in NOT_A_SECRET or "*" in value or not self._looks_secret(value):
+            if word in NOT_A_SECRET or "*" in value or _is_code_ref(value) or not self._looks_secret(value):
                 return m.group(0)
             self.learn(value)
             return MASK + rest

@@ -13,7 +13,7 @@ def test_sensitive_keys_in_data():
 
 
 def test_bearer_keeps_scheme():
-    assert m().mask_str("Authorization: Bearer abcdefgh12345") == "Authorization: **** ****"
+    assert m().mask_str("Authorization: Bearer abcdefgh12345") == "Authorization: Bearer ****"
 
 
 def test_key_equals_value_in_text():
@@ -79,3 +79,20 @@ def test_parse_csv():
     cols, rows = parse_csv('a,b,c\n1,2,3\n"x,y",5,6')
     assert cols == ["a", "b", "c"]
     assert rows == [["1", "2", "3"], ["x,y", "5", "6"]]
+
+
+def test_code_is_not_a_secret():
+    # a key followed by code in a traceback or snippet: nothing to mask, and "await" / "None" are never learned
+    k = m()
+    assert k.mask_str("token = await login()") == "token = await login()"
+    assert k.mask_str('password = os.environ["PASSWORD"]') == 'password = os.environ["PASSWORD"]'
+    assert k.mask_str("password = None") == "password = None"
+    assert k.mask_str("await page.goto(url); x = None") == "await page.goto(url); x = None"
+    assert k.mask_str("password=S3cret!x") == "password=****"
+
+
+def test_pwd_env_is_not_a_secret():
+    from reporting_labs.core.mask import Masker
+    k = Masker(environ={"PWD": "/home/ci/project", "OLDPWD": "/home/ci", "DB_PWD": "Db-Secret-991"})
+    assert k.mask_str('File "/home/ci/project/tests/test_a.py", line 3') == 'File "/home/ci/project/tests/test_a.py", line 3'
+    assert k.mask_str("connecting with Db-Secret-991") == "connecting with ****"
