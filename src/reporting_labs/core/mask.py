@@ -58,15 +58,19 @@ NOT_A_VALUE = {"bearer", "basic", "digest", "token", "undefined", "redacted", "h
 # `password = os.environ["PASSWORD"]`, `secret = None`. Masking these would also teach the masker "await" or "None"
 # and blank it across the whole report. Same rule as the Node.js and Java maskers.
 _CODE_WORDS = {"await", "async", "new", "this", "self", "null", "undefined", "none", "nil", "true", "false", "function",
-               "return", "typeof", "require", "import", "yield", "const", "let", "var"}
-_CODE_REF = re.compile(r"^`?\$\{|^`?(Bearer|Basic|Digest|Token)$|^(process\.env|import\.meta\.env|os\.environ|os\.getenv|System\.getenv|ENV)\b", re.I)
+               "return", "typeof", "require", "import", "yield", "const", "let", "var",
+               # type names: `password: str`, `token: string`, `pin: int`
+               "string", "number", "boolean", "bigint", "any", "unknown", "object", "void", "never", "symbol", "str", "int",
+               "float", "bool", "bytes", "dict", "list"}
+_CODE_REF = re.compile(r"^`?\$\{|^\{\w+\}$|^`?(Bearer|Basic|Digest|Token)$|^(process\.env|import\.meta\.env|os\.environ|os\.getenv|System\.getenv|ENV)\b", re.I)
 # PWD / OLDPWD are the shell's current folder ("pwd" is also a password key): learning them would blank the
 # project path in every traceback and editor link
 _NOT_SECRET_ENV = {"PWD", "OLDPWD"}
 
 
 def _is_code_ref(value: str) -> bool:
-    return value.lower() in _CODE_WORDS or bool(_CODE_REF.search(value))
+    v = re.sub(r"[)\]},;:.]+$", "", value)   # `password: str)` in a signature
+    return v.lower() in _CODE_WORDS or bool(_CODE_REF.search(v))
 
 
 NOT_A_SECRET = {

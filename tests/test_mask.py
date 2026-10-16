@@ -96,3 +96,12 @@ def test_pwd_env_is_not_a_secret():
     k = Masker(environ={"PWD": "/home/ci/project", "OLDPWD": "/home/ci", "DB_PWD": "Db-Secret-991"})
     assert k.mask_str('File "/home/ci/project/tests/test_a.py", line 3') == 'File "/home/ci/project/tests/test_a.py", line 3'
     assert k.mask_str("connecting with Db-Secret-991") == "connecting with ****"
+
+
+def test_type_names_are_not_secrets():
+    # `password: str` in a signature, `password {string}` in a Cucumber step: types, not values
+    k = m()
+    assert k.mask_str("def login(user: str, password: str):") == "def login(user: str, password: str):"
+    assert k.mask_str("Given('I sign in with password {string}')") == "Given('I sign in with password {string}')"
+    assert k.mask_str("password: string)") == "password: string)"
+    assert k.mask_str("text: string") == "text: string"
