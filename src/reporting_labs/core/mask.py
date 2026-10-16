@@ -62,7 +62,7 @@ _CODE_WORDS = {"await", "async", "new", "this", "self", "null", "undefined", "no
                # type names: `password: str`, `token: string`, `pin: int`
                "string", "number", "boolean", "bigint", "any", "unknown", "object", "void", "never", "symbol", "str", "int",
                "float", "bool", "bytes", "dict", "list"}
-_CODE_REF = re.compile(r"^`?\$\{|^\{\w+\}$|^`?(Bearer|Basic|Digest|Token)$|^(process\.env|import\.meta\.env|os\.environ|os\.getenv|System\.getenv|ENV)\b", re.I)
+_CODE_REF = re.compile(r"^`?\$\{|(?-i:^\{(?:[a-z_][A-Za-z_]*)?\}?$)|^`?(Bearer|Basic|Digest|Token)$|^(process\.env|import\.meta\.env|os\.environ|os\.getenv|System\.getenv|ENV)\b", re.I)
 # PWD / OLDPWD are the shell's current folder ("pwd" is also a password key): learning them would blank the
 # project path in every traceback and editor link
 _NOT_SECRET_ENV = {"PWD", "OLDPWD"}

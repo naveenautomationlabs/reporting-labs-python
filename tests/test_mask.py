@@ -105,3 +105,12 @@ def test_type_names_are_not_secrets():
     assert k.mask_str("Given('I sign in with password {string}')") == "Given('I sign in with password {string}')"
     assert k.mask_str("password: string)") == "password: string)"
     assert k.mask_str("text: string") == "text: string"
+
+
+def test_placeholders_are_not_secrets():
+    # f-string / format placeholders are code; a braced real value is still masked
+    k = m()
+    assert k.mask_str('f"no token for password={password}"') == 'f"no token for password={password}"'
+    assert k.mask_str('log.info("password={}", pw)') == 'log.info("password={}", pw)'
+    assert "S3cret" not in k.mask_str("password={S3cret}")
+    assert "Secret" not in m().mask_str("password={Secret}")
