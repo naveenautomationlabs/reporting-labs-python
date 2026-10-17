@@ -271,4 +271,8 @@ Full details for security reviewers and client projects, including what is read,
 
 ## License
 
-MIT. The report is a file you own; nothing leaves your machine or your CI.
+MIT © 2026 Naveen Khunteta (Naveen Automation Labs), first released in September 2026. See [LICENSE](./LICENSE). The report is a file you own; nothing leaves your machine or your CI.
+
+**Name and logo.** The code is MIT-licensed. The reportingLabs name and logo are not: forks and derived projects are welcome, but please don't use them in a way that suggests your project is reportingLabs or endorsed by it.
+
+**Building on reportingLabs?** You're welcome to. If your project uses its code or is modelled on its report, a link back to [reportingLabs](https://github.com/naveenautomationlabs/reporting-labs) is appreciated.
