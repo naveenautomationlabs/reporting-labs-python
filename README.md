@@ -55,6 +55,8 @@ def test_checkout(page):
 | Priority, owner, feature charts and filters | `@pytest.mark.meta(...)` or `meta(...)` |
 | Every `requests` / `httpx` call in the API tab | automatic |
 | Captured stdout / stderr, with secrets masked | automatic |
+| What changed since the last run: new failures, fixed, still failing, got slower, new tests | automatic, from the second run |
+| The command that runs a test again (`pytest "tests/test_login.py::test_login[guest]"`), on every test and for all failed tests at once | automatic |
 
 Turn it off for a run with `-p no:reporting_labs` or `--no-rl`.
 
@@ -145,6 +147,9 @@ robot --listener reporting_labs.RobotListener tests/
 
 One row per test case, suites as the path, every keyword a step, setup and teardown as hooks, tags as
 filters, and the screenshots SeleniumLibrary or the Browser library embed in the log attached to the test.
+
+Every test also shows the command that runs it again: `robot --test "Locked Account Shows Message" tests/login.robot`.
+
 Options go after a colon: `--listener reporting_labs.RobotListener:title=Checkout:output=reports/rl`.
 See `examples/robot-selenium`.
 

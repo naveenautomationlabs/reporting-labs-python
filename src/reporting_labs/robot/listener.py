@@ -39,6 +39,7 @@ class ReportingLabsListener:
         self.root = Path.cwd()
         self.opts = options_mod.load(self.root, self.overrides, self.config_file)
         self.run = collector.Run(self.opts, "robot")
+        self.run.rerun = {"pre": "robot ", "sep": " "}
         self.output_dir: Optional[Path] = None
         self.attempt: Optional[Attempt] = None
         self.test_id: Optional[str] = None
@@ -86,8 +87,11 @@ class ReportingLabsListener:
         doc_values, doc_tags = doc_meta.parse(str(data.doc or "")) if self.opts.get("commentMeta") is not False else ({}, [])
         tags = [str(t) for t in data.tags]
         tags += [t for t in doc_tags if t not in tags and t.lower() not in self.opts.meta_keys()]
-        self.run.test(self.test_id, data.name, list(self.suite_stack[1:]) if len(self.suite_stack) > 1 else [], file, int(data.lineno or 0),
-                      self.project or "robot", tags=tags, timeout=_timeout_ms(data))
+        t = self.run.test(self.test_id, data.name, list(self.suite_stack[1:]) if len(self.suite_stack) > 1 else [], file, int(data.lineno or 0),
+                          self.project or "robot", tags=tags, timeout=_timeout_ms(data))
+        # robot --test "Name" path/to/suite.robot: the test by its name, in its own file
+        if source:
+            t.rerun = ["--test " + collector.shell_arg(str(data.name)), collector.shell_arg(os.path.relpath(source).replace(os.sep, "/"))]
         self.attempt = Attempt(self.test_id)
         keys = self.opts.meta_keys()  # known keys only, like meta from comments in Node.js
         for k, v in doc_values.items():

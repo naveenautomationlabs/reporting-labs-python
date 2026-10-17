@@ -567,6 +567,19 @@ html,body{-webkit-font-smoothing:antialiased}
 /* ---------- run status, errors outside tests, snippets ---------- */
 .att-err{padding:12px 14px;background:var(--fail-bg);color:var(--ink);border-radius:8px 8px 0 0;line-height:1.5} .att-err code{font:12px var(--mono);background:var(--surface);padding:1px 5px;border-radius:4px}
 .runbanner{margin-bottom:14px;padding:10px 14px;border-radius:10px;background:var(--flaky-bg);color:var(--flaky-ink);border:1px solid color-mix(in srgb,var(--flaky) 40%,transparent)}
+/* ---------- since last run, run again ---------- */
+.chg{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;margin-top:16px;padding:10px 12px 10px 16px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink-2)}
+.chg .lead{font-weight:600;color:var(--ink)} .chg .lead small{font-weight:400;color:var(--ink-3);margin-left:6px}
+.chg .seg{font:inherit;color:inherit;padding:2px 0;border-bottom:1px dashed transparent;cursor:pointer} .chg .seg b{font-weight:600}
+.chg .seg:hover,.chg .seg[aria-expanded=true]{border-bottom-color:currentColor}
+.chg .seg.nf{color:var(--fail)} .chg .seg.fx{color:var(--pass)} .chg .seg.sf{color:var(--ink)} .chg .seg.sl{color:var(--flaky-ink)} .chg .seg.nt{color:var(--accent-2)}
+.chg .same{color:var(--ink-3)} .chg .spacer{flex:1}
+.chg-list[hidden]{display:none} .chg-list{flex-basis:100%;list-style:none;margin:2px 0 0;padding:8px 0 0;border-top:1px solid var(--line);display:grid;gap:2px}
+.chg-list button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:4px 6px;border-radius:6px;color:var(--ink);font:inherit;cursor:pointer;min-width:0} .chg-list button:hover{background:var(--surface-2)}
+.chg-list .st{width:8px;height:8px;border-radius:50%;flex:none} .chg-list .n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .chg-list .f{margin-left:auto;flex:none;color:var(--ink-3);font-size:12px} .chg-list .more{color:var(--ink-3);font-size:12px;padding:4px 6px}
+.rerun{display:flex;align-items:center;gap:10px;margin:12px 0;padding:5px 5px 5px 12px;background:var(--surface-2);border-radius:6px;min-width:0}
+.rerun .k{flex:none;font-size:12px;color:var(--ink-3)} .rerun code{flex:1;min-width:0;font:12px var(--mono);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .rerun .btn{flex:none;background:var(--surface)}
+@media print{.chg,.rerun{display:none}}
 .note{padding:10px 14px;border-radius:8px;margin-bottom:10px;border:1px solid var(--line)} .note.ok{background:var(--pass-bg);color:var(--ink)} .note.warn{background:var(--flaky-bg);color:var(--flaky-ink)}
 .badge.xfail{background:var(--flaky-bg);color:var(--flaky-ink)}
 .xp{font-weight:500} .xp.all{color:var(--ink)} .xp.some{color:var(--flaky-ink)}
@@ -834,6 +847,7 @@ function failuresView(){
   const cl=failureClusters();
   const grid=h('div',{class:'grid'});
   grid.append(h('div',{class:'w12 fx-tools'}, h('span',{class:'fx-sum'}, bad.length+' failed or flaky', PREV.length? ' · '+bad.filter(t=>isFail(t.outcome)&&sinceInfo(t).kind==='new').length+' new since '+runLabel(PREV[PREV.length-1]) : ''), h('span',{class:'spacer'}),
+    (()=>{ const c=rerunCmd(data.tests.filter(t=>isFail(t.outcome))); return c? h('button',{class:'btn',title:c,onclick:e=>copyText(c,e.currentTarget,'Command copied')},'Copy re-run command') : null; })(),
     h('button',{class:'btn',onclick:exportCsv,title:'Failures as CSV for Jira or a sheet'},'Download CSV'), h('button',{class:'btn',onclick:exportJson,title:'Failures as JSON'},'Download JSON'), h('button',{class:'btn primary',onclick:e=>copyText(summaryMarkdown(),e.currentTarget,'Copied for Slack')},'Copy summary')));
   if(cl.length) grid.append(h('div',{class:'card w6 fail-rail'}, h('h2',{},'Failure clusters', h('span',{class:'hint'},cl.length+' distinct error'+(cl.length>1?'s':''))), clustersView(cl)));
   if(DIMS.length) grid.append(h('div',{class:'card w6 fail-rail'}, h('h2',{},'Needs attention', h('span',{class:'hint'},'ranked by priority and severity')), attention()));
@@ -1167,7 +1181,8 @@ function summary(){
       pill('passed','Passed',s.passed,'var(--pass)', ok&&s.passed? 'Every test on first attempt' : 'On first attempt', '', hseries(e=>e.passed)),
       pill('failed','Failed',failed,'var(--fail)', failed? (nNew!=null? nNew+' new · '+(failed-nNew)+' known' : nClu+' root cause'+(nClu===1?'':'s')) : 'Nothing broke', failed?'down':'', hseries(e=>e.failed)),
       pill('flaky','Flaky',s.flaky,'var(--flaky)', s.flaky? 'Passed on retry' : 'No retries needed', '', hseries(e=>e.flaky)),
-      pill('skipped','Skipped',s.skipped,'var(--skip)', s.skipped? 'Not executed' : 'Everything ran', '', hseries(e=>e.skipped))));
+      pill('skipped','Skipped',s.skipped,'var(--skip)', s.skipped? 'Not executed' : 'Everything ran', '', hseries(e=>e.skipped))),
+    data.options.widgets.changes!==false? changesLine() : null);
   if(data.options.widgets.runStrip && data.tests.length){
     const strip = h('div',{class:'strip',id:'strip'}, data.tests.map(t=>h('button',{class:'cell '+t.outcome,'data-id':t.id,title:t.title+' · '+label[t.outcome]+' · '+ms(t.duration),'aria-label':t.title,onclick:()=>select(t.id)})));
     el.append(strip, h('div',{class:'strip-cap'}, 'Every test in run order. Hover for details, click to open.'));
@@ -1204,6 +1219,51 @@ function prevRun(){
   let fallback=null;
   for(let i=H.length-2;i>=0;i--){ if(!comparable(H[i])) continue; if(!cur.label||H[i].label!==cur.label) return H[i]; if(!fallback) fallback=H[i]; }
   return fallback;
+}
+
+/* ---------- since last run, and the command to run tests again ---------- */
+/* The command that runs these tests again. The runner gives the shape in data.rerun ({pre, sep, post}) and each test
+   its target first, then options it needs (Playwright: file:line, then --project=...). Targets and options are
+   de-duplicated, so a spec that failed twice is listed once. */
+function rerunCmd(ts){
+  const R=data.rerun; if(!R) return '';
+  const ok=ts.filter(t=>t.rerun&&t.rerun.length); if(!ok.length) return '';
+  const uniq=a=>[...new Set(a)];
+  return R.pre+uniq(ok.map(t=>t.rerun[0])).join(R.sep)+(R.post||'')+uniq(ok.flatMap(t=>t.rerun.slice(1))).map(o=>' '+o).join('');
+}
+/* One line under the cards: what changed against the previous comparable run, each part opens its tests.
+   Without history it still offers the command for the failed tests. */
+function changesLine(){
+  const p=prevRun(), base=p&&p.tests? p : null;
+  const failed=data.tests.filter(t=>isFail(t.outcome)), cmd=rerunCmd(failed);
+  if(!base&&!cmd) return null;
+  const segs=[];
+  if(base){
+    const was=t=>{ const r=base.tests[t.key]; return r? r[0] : null; };
+    const nf=[], fx=[], sf=[], nt=[];
+    for(const t of data.tests){ const w=was(t), f=isFail(t.outcome);
+      if(!w) nt.push(t);
+      if(f&&w!=='f') nf.push(t); else if(f) sf.push(t); else if(w==='f'&&(t.outcome==='passed'||t.outcome==='flaky')) fx.push(t); }
+    const sl=regressions().map(r=>r.t).filter(t=>!isFail(t.outcome)), pl=(n,a,b)=>n===1?a:b;
+    segs.push(['nf',nf,pl(nf.length,'new failure','new failures')], ['fx',fx,'fixed'], ['sf',sf,'still failing'], ['sl',sl,'got slower'], ['nt',nt,pl(nt.length,'new test','new tests')]);
+  }
+  const shown=segs.filter(x=>x[1].length);
+  const el=h('div',{class:'chg'}), list=h('ul',{class:'chg-list',hidden:''});
+  let open=null;
+  const toggle=(k,ts,btn)=>{ el.querySelectorAll('.seg').forEach(b=>b.setAttribute('aria-expanded','false'));
+    if(open===k){ open=null; list.hidden=true; return; }
+    open=k; btn.setAttribute('aria-expanded','true'); list.hidden=false; list.innerHTML='';
+    list.append(...ts.slice(0,12).map(t=>h('li',{}, h('button',{onclick:()=>select(t.id)}, h('span',{class:'st '+t.outcome}), h('span',{class:'n'},t.title), h('span',{class:'f'},t.file.split('/').pop()+(data.projects.length>1&&t.project?' · '+t.project:''))))));
+    if(ts.length>12) list.append(h('li',{class:'more'},'and '+(ts.length-12)+' more'));
+  };
+  if(base) el.append(h('span',{class:'lead'},'Since last run', h('small',{},runLabel(base))));
+  else el.append(h('span',{class:'lead'}, failed.length+' failed'));
+  if(base&&!shown.length) el.append(h('span',{class:'same'},'Same results, nothing changed.'));
+  for(const [k,ts,txt] of shown){ const b=h('button',{class:'seg '+k,'aria-expanded':'false',onclick:()=>toggle(k,ts,b)}, h('b',{},ts.length),' '+txt); el.append(b); }
+  el.append(h('span',{class:'spacer'}));
+  if(cmd) el.append(h('button',{class:'btn',title:cmd,onclick:e=>copyText(cmd,e.currentTarget,'Command copied')},'Copy re-run command'+(failed.length>1?' ('+failed.length+' failed)':'')));
+  el.append(list);
+  return el;
 }
 
 /* ---------- run history per test ---------- */
@@ -1718,6 +1778,7 @@ function renderDetail(t, d, retryIdx){
       (()=>{ const r=t.results[t.results.length-1]; const e=r&&r.errors[0]; return e? [h('button',{class:'btn',onclick:ev=>copyText(t.title+'\n'+t.file+':'+t.line+'\n\n'+e.message,ev.currentTarget,'Error copied')},'Copy error'), h('button',{class:'btn primary',onclick:()=>openBugReport(t)},'Bug report')] : null; })(),
       editorLink(t))),
     h('div',{class:'badges'}, h('span',{class:'badge '+t.outcome},label[t.outcome]), t.expectedFailure? h('span',{class:'badge xfail',title:'Marked test.fail(): failing is the expected result'},'Expected failure') : null, sinceBadge(t), dots(t,10), data.bdd?h('span',{class:'badge scenario'},'Scenario'):null, t.tags.map(g=>h('span',{class:'badge tag'},g)), data.projects.length>1?h('span',{class:'badge tag'},t.project):null, (()=>{ const xp=isFail(t.outcome)&&xproj(t); return xp? xpTag(xp,'badge') : null; })(), h('span',{class:'loc'}, t.file+':'+t.line+' · '+ms(t.duration)+(t.outcome==='timedOut'&&t.timeout?' · timeout '+ms(t.timeout):'')+(t.retries?' · retries '+t.retries:''))));
+  const rc=rerunCmd([t]); if(rc) d.append(h('div',{class:'rerun'}, h('span',{class:'k'},'Run again'), h('code',{title:rc},rc), h('button',{class:'btn',onclick:e=>copyText(rc,e.currentTarget,'Copied')},'Copy')));
   const metaKeys=Object.keys(t.meta);
   const linkFor=(k,v)=>{ if(t.links&&t.links[k]) return t.links[k]; const tpl=data.options.links[k]||data.options.links['*']; if(tpl) return tpl.replace('{id}',encodeURIComponent(v)); if(/^https?:\/\//.test(v)) return v; return null; };
   if(metaKeys.length) d.append(h('div',{class:'metas'}, metaKeys.map(k=>{ const v=t.meta[k], low=/^(P[3-4]|low|minor|trivial|normal|medium)$/i.test(v); const parts=(t.links&&t.links[k])||!data.options.links[k]&&!data.options.links['*']?[v]:v.split(/,\s+/); const nodes=[]; parts.forEach((part,i)=>{ const href=linkFor(k,part); if(i) nodes.push(', '); nodes.push(href? h('a',{href,target:'_blank',rel:'noopener'},part) : h('span',{class:'v'},part)); }); return h('span',{class:'meta '+k+(low?' low':'')}, h('span',{class:'k'},k), ...nodes); })));

@@ -157,3 +157,25 @@ def test_timeout_and_xpass_outcomes(pytester: pytest.Pytester):
     by = {t["title"]: t["outcome"] for t in _report(pytester)["tests"]}
     assert by["test_times_out"] == "timedOut"
     assert by["test_xpasses"] == "failed"
+
+
+def test_rerun_command(pytester: pytest.Pytester):
+    pytester.makepyfile(
+        test_y="""
+        import pytest
+
+        def test_ok():
+            pass
+
+        @pytest.mark.parametrize("user", ["admin", "a guest"])
+        def test_login(user):
+            assert user == "admin"
+        """
+    )
+    _run(pytester)
+    data = _report(pytester)
+    assert data["rerun"] == {"pre": "pytest ", "sep": " "}
+    by = {t["title"]: t["rerun"] for t in data["tests"]}
+    assert by["test_ok"] == ["test_y.py::test_ok"]
+    # a parametrized id with a space is quoted for the shell
+    assert ['"test_y.py::test_login[a guest]"'] in by.values()

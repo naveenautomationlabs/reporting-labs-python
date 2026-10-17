@@ -81,3 +81,20 @@ def test_writer_emits_html_and_json(tmp_path):
     html = writer.write(data, opts)
     assert html.is_file() and html.stat().st_size > 100_000
     assert (opts.out_dir / "report.json").is_file()
+
+
+def test_shell_arg():
+    assert collector.shell_arg("tests/test_x.py::test_a") == "tests/test_x.py::test_a"
+    assert collector.shell_arg("tests/test_x.py::test_a[1]") == '"tests/test_x.py::test_a[1]"'
+    assert collector.shell_arg('a "b" $c') == '"a \\"b\\" \\$c"'
+
+
+def test_rerun_only_when_a_test_has_one(tmp_path):
+    run, opts = _run(tmp_path)
+    run.rerun = {"pre": "pytest ", "sep": " "}
+    run.test("a", "a", [], "t.py", 1, "proj")
+    a = Attempt("a"); a.finish("passed"); run.add_attempt("a", a)
+    assert "rerun" not in run.build()
+    run.tests["a"].rerun = ["t.py::a"]
+    data = run.build()
+    assert data["rerun"] == {"pre": "pytest ", "sep": " "} and data["tests"][0]["rerun"] == ["t.py::a"]

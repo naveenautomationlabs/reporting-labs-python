@@ -60,7 +60,7 @@ DEFAULTS: Dict[str, Any] = {
     "stepsFromTools": True,      # Playwright / Selenium actions as steps
 }
 
-WIDGET_KEYS = ["runStrip", "outcome", "attention", "dimensions", "timeline", "durations", "tags", "slowest", "projects", "flaky", "environment", "skipped"]
+WIDGET_KEYS = ["runStrip", "outcome", "attention", "dimensions", "timeline", "durations", "tags", "slowest", "projects", "flaky", "environment", "skipped", "changes"]
 META_KEYS = ["priority", "severity", "owner", "feature", "epic", "story", "issue", "testcaseid", "component", "team", "sprint", "ticket", "jira"]
 SCALAR_ENV = {"TITLE": "title", "THEME": "theme", "PALETTE": "palette", "ACCENT": "accent", "LOGO": "logo", "OUTPUT_FOLDER": "outputFolder", "OPEN": "open"}
 

@@ -270,6 +270,7 @@ class Controller:
         self.opts = opts
         self.project = project
         self.run = collector.Run(opts, "pytest")
+        self.run.rerun = {"pre": "pytest ", "sep": " "}
         self.attempts: Dict[str, Attempt] = {}        # nodeid -> the attempt being assembled from phase reports
         self._after_rerun: set = set()
         self.collected: List[Dict[str, Any]] = []
@@ -319,6 +320,16 @@ class Controller:
         self.run.run_status = "interrupted"
 
     # -- one test, one or more attempts, three phase reports each ---------------------------------
+    def _from_cwd(self, nodeid: str) -> str:
+        """A node id is relative to the rootdir; the re-run command runs from where pytest was started."""
+        try:
+            file, sep, rest = nodeid.partition("::")
+            start = Path(self.config.invocation_params.dir)
+            rel = os.path.relpath(Path(self.config.rootpath) / file, start).replace(os.sep, "/")
+            return rel + sep + rest
+        except Exception:
+            return nodeid
+
     def _register(self, nodeid: str, info: Dict[str, Any], location: Any = None) -> collector.TestRecord:
         file, line, path, title = self._split(nodeid, location)
         project = info.get("project") or self.project or self._browser_from_title(title) or "pytest"
@@ -346,6 +357,7 @@ class Controller:
                 if t is not None:
                     t.project = project
         t = self.run.test(nodeid, title, path, file, line, project, tags=tags, timeout=info.get("timeout"))
+        t.rerun = [collector.shell_arg(self._from_cwd(nodeid))]
         if info.get("_tag_meta"):
             for k, v in info["_tag_meta"].items():
                 t.meta.setdefault(k, v)

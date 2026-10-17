@@ -20,6 +20,11 @@ EXT = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
+def shell_arg(s: str) -> str:
+    """Quotes a command-line argument when it needs it (spaces, brackets, quotes, shell characters)."""
+    return s if re.fullmatch(r"[\w@%+=:,./-]+", s) else '"' + re.sub(r'(["\\$`])', r"\\\1", s) + '"'
+
+
 @dataclass
 class TestRecord:
     id: str
@@ -41,6 +46,7 @@ class TestRecord:
     expected_failure: bool = False
     xpass: bool = False
     column: Optional[int] = None
+    rerun: Optional[List[str]] = None         # what runs this test again: its target, then options (see Run.rerun)
 
     @property
     def key(self) -> str:
@@ -65,6 +71,8 @@ class Run:
         self.workers = 1
         self._asset_counter = 0
         self.projects_seen: List[str] = []
+        # How the re-run command is put together: pre + the tests' targets joined with sep + post, then their options
+        self.rerun: Optional[Dict[str, str]] = None
 
     # -- registering -------------------------------------------------------------------------------
     def test(self, id: str, title: str, path: Sequence[str], file: str, line: int, project: str = "", **kw: Any) -> TestRecord:
@@ -153,6 +161,8 @@ class Run:
             "globalOutput": [{"stream": o["stream"], "text": self.masker.mask_str(o["text"])} for o in self.global_output],
             "options": opts.report_options(logo_mod.resolve(opts.get("logo"), opts.base), editor_default),
         }
+        if self.rerun and any(t.get("rerun") for t in tests):
+            data["rerun"] = dict(self.rerun)
         return data
 
     # -- per test ----------------------------------------------------------------------------------
@@ -179,6 +189,8 @@ class Run:
             d["timeout"] = t.timeout
         if t.retries is not None:
             d["retries"] = t.retries
+        if t.rerun:
+            d["rerun"] = [self.masker.mask_str(x) for x in t.rerun]
         return d
 
     def _outcome(self, t: TestRecord):
