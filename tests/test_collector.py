@@ -98,3 +98,16 @@ def test_rerun_only_when_a_test_has_one(tmp_path):
     run.tests["a"].rerun = ["t.py::a"]
     data = run.build()
     assert data["rerun"] == {"pre": "pytest ", "sep": " "} and data["tests"][0]["rerun"] == ["t.py::a"]
+
+
+def test_star_line_once_a_week_never_in_ci(tmp_path):
+    import os, time
+    from reporting_labs.core import writer
+    mark = tmp_path / "star"
+    assert writer.star_line({}, mark) and not writer.star_line({}, mark)       # once, then quiet for a week
+    old = time.time() - 8 * 24 * 3600
+    os.utime(mark, (old, old))
+    assert writer.star_line({}, mark)
+    mark.unlink()
+    assert writer.star_line({"CI": "true"}, mark) is None and writer.star_line({"REPORTING_LABS_NO_STAR": "1"}, mark) is None
+    assert not mark.exists()

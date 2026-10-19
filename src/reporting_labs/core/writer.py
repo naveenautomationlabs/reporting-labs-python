@@ -6,6 +6,8 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -117,7 +119,32 @@ def announce_lines(html: Path, data: Dict[str, Any], options: Options) -> List[s
             lines.append("reporting-labs: PDF skipped - no Chrome, Edge or Chromium found "
                          "(set chromePath, or pdf: false to silence)")
     lines += missing_meta(data["tests"], options)
+    star = star_line()
+    if star:
+        lines.append(star)
     return lines
+
+
+_CI_VARS = ("CI", "TF_BUILD", "JENKINS_URL", "GITLAB_CI", "BUILDKITE", "CIRCLECI", "TEAMCITY_VERSION", "CODEBUILD_BUILD_ID", "BITBUCKET_BUILD_NUMBER")
+
+
+def star_line(env: Optional[Dict[str, str]] = None, mark: Optional[Path] = None) -> Optional[str]:
+    """At most once a week, on a developer's machine (never in CI), one line asking for a GitHub star: most people who
+    use the reporter never see the repository. Off with announce: false or REPORTING_LABS_NO_STAR=1."""
+    env = os.environ if env is None else env
+    if env.get("REPORTING_LABS_NO_STAR") or any(env.get(k) for k in _CI_VARS):
+        return None
+    mark = mark or Path(tempfile.gettempdir()) / "reporting-labs-star"
+    try:
+        if time.time() - mark.stat().st_mtime < 7 * 24 * 3600:
+            return None
+    except OSError:
+        pass  # never shown on this machine
+    try:
+        mark.touch()  # the time it was shown keeps it to once a week: if it cannot be kept, stay quiet
+    except OSError:
+        return None
+    return "reporting-labs: If reportingLabs helps you, a GitHub star helps other testers find it: https://github.com/naveenautomationlabs/reporting-labs"
 
 
 def missing_meta(tests: List[Dict[str, Any]], options: Options) -> List[str]:

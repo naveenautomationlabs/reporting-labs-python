@@ -211,7 +211,7 @@ All options:
 | `pdfFile` | `"report.pdf"` | File name of the PDF |
 | `chromePath` | – | The Chrome / Edge / Chromium that prints the PDF, when it is not found on its own (or set `CHROME_PATH`) |
 | `embedFonts` | `true` | Bundle the fonts (~140 KB) so the report looks the same offline |
-| `announce` | `true` | Print the report path after the run |
+| `announce` | `true` | Print the report path after the run. On a developer's machine (never in CI) it also asks for a GitHub star, at most once a week; `REPORTING_LABS_NO_STAR=1` turns only that off |
 | `open` | `"on-failure"` | Open the report in the browser after the run: `"on-failure"`, `"always"` or `"never"`. Never opens in CI |
 | `captureApi` | `true` | Record every `requests` / `httpx` call in the API tab |
 | `apiMaxBody` | 64 KB | Bytes of a request or response body kept |
