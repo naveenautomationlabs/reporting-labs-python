@@ -514,6 +514,8 @@ html,body{-webkit-font-smoothing:antialiased}
 /* tests view */
 .main{margin-top:20px}
 .list{top:12px;max-height:calc(100vh - 24px)}
+/* one column (phones, narrow windows): the list scrolls away instead of staying pinned over the test detail below it */
+@media (max-width:900px){.list{position:static;max-height:60vh}}
 .tools{padding:12px;gap:8px;background:var(--surface)}
 .tools input,.tools select{border-radius:8px;background:var(--bg);border-color:var(--line)}
 .tools input:focus,.tools select:focus{border-color:var(--accent);outline:0;box-shadow:0 0 0 3px var(--accent-tint)}
@@ -1773,6 +1775,8 @@ function select(id, quiet){
   const t=data.tests.find(x=>x.id===id); if(!t) return;
   state.selected=id; state.retry=t.results.length-1; if(!quiet){ if(state.view!=='tests') showView('tests'); else setHash(); } refresh(true); renderDetail(t);
   const it=document.querySelector('.item[data-id="'+id+'"]'); if(it&&it.scrollIntoView) it.scrollIntoView({block:'nearest'});
+  // one column: the detail is below the list, so bring it into view
+  if(!quiet&&window.innerWidth<=900){ const d=$('#detail'); if(d&&d.scrollIntoView) d.scrollIntoView({block:'start'}); }
 }
 function renderDetail(t, d, retryIdx){
   d=d||$('#detail'); d.innerHTML='';
