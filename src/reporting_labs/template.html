@@ -201,6 +201,9 @@ a{color:var(--accent)}
 
 /* ---------- detail ---------- */
 .detail{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;min-width:0}
+/* a long URL, path or token with no spaces (an OAuth redirect in a step error) breaks instead of widening the page */
+.detail :is(.e,.crumb,.loc,.errloc,.txt,.logs,.note,.err,.kv dd,.kv2 dd){overflow-wrap:anywhere}
+.detail .kv{grid-template-columns:auto minmax(0,1fr)} .detail .kv2{grid-template-columns:max-content minmax(0,1fr)}
 .crumb{font-size:12px;color:var(--ink-3)} .crumb span+span::before{content:" / ";color:var(--line)}
 .detail h3{font-size:20px;font-weight:600;margin:6px 0 10px;letter-spacing:-.01em;overflow-wrap:anywhere;min-width:0}
 .badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
