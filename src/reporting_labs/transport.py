@@ -26,7 +26,8 @@ def dump(a: Attempt) -> Dict[str, Any]:
         "logs": list(a.logs),
         "data": [{"name": d["name"], "data": json_safe(d["data"])} for d in a.data],
         "api": [json_safe(c) for c in a.api],
-        "attachments": [{"name": x.name, "content_type": x.content_type, "path": x.path,
+        "browser": [json_safe(e) for e in a.browser],
+        "attachments": [{"name": x.name, "content_type": x.content_type, "path": x.path, "video_start": x.video_start,
                          "body": base64.b64encode(x.body).decode("ascii") if x.body is not None else None} for x in a.attachments],
         "errors": [{"message": e.message, "stack": e.stack, "exc_type": e.exc_type, "location": e.location, "snippet": e.snippet} for e in a.errors],
         "meta": json_safe(a.meta),
@@ -41,7 +42,9 @@ def load(d: Dict[str, Any]) -> Attempt:
     a.logs = list(d.get("logs", []))
     a.data = list(d.get("data", []))
     a.api = list(d.get("api", []))
-    a.attachments = [Attachment(x["name"], x["content_type"], base64.b64decode(x["body"]) if x.get("body") else None, x.get("path")) for x in d.get("attachments", [])]
+    a.browser = list(d.get("browser", []))
+    a.attachments = [Attachment(x["name"], x["content_type"], base64.b64decode(x["body"]) if x.get("body") else None, x.get("path"), x.get("video_start"))
+                     for x in d.get("attachments", [])]
     a.errors = [ErrorInfo(e["message"], e.get("stack"), e.get("exc_type"), e.get("location"), e.get("snippet")) for e in d.get("errors", [])]
     a.meta = dict(d.get("meta", {}))
     a.stdout, a.stderr = list(d.get("stdout", [])), list(d.get("stderr", []))
@@ -55,6 +58,7 @@ def merge(into: Attempt, more: Dict[str, Any]) -> None:
     into.logs.extend(other.logs)
     into.data.extend(other.data)
     into.api.extend(other.api)
+    into.browser.extend(other.browser)
     into.attachments.extend(other.attachments)
     into.errors.extend(other.errors)
     into.meta.update(other.meta)

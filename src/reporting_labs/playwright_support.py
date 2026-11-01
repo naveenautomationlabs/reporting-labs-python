@@ -122,12 +122,131 @@ def _page_of(target: Any) -> Any:
     return None
 
 
+_ABORTED = re.compile(r"ERR_ABORTED|NS_BINDING_ABORTED|cancelled", re.I)
+_FAVICON = re.compile(r"/favicon\.ico(\?.*)?$")
+# when each test's last page closed (ms since epoch): a video ends then, so its first frame is that minus its length
+_closed_at: Dict[str, float] = {}
+
+
+def _watch(attempt: Attempt, page: Any) -> None:
+    """What the browser reports while the test runs, for the report's "What the browser saw": uncaught JavaScript
+    errors, console.error messages, and requests that got no response or a 4xx/5xx."""
+    if getattr(page, "_rl_watched", False):
+        return
+    try:
+        page._rl_watched = True
+    except Exception:
+        return
+    first = weakref.ref(attempt)
+
+    def target() -> Optional[Attempt]:
+        # the test running now (a page shared by several tests), else the one that first used the page
+        return context.current() or first()
+
+    def safe(fn: Callable) -> Callable:
+        def run(*a: Any) -> None:
+            try:
+                fn(*a)
+            except Exception:
+                pass  # a listener must never break the test
+        return run
+
+    def page_url() -> Optional[str]:
+        try:
+            return page.url
+        except Exception:
+            return None
+
+    def on_error(err: Any) -> None:
+        a = target()
+        if a is None:
+            return
+        msg = getattr(err, "message", None) or str(err)
+        name = getattr(err, "name", None)
+        stack = getattr(err, "stack", None)
+        text = f"{name}: {msg}" if name and not str(msg).startswith(str(name)) else str(msg)
+        a.browser_event("error", text.splitlines()[0] if text else "", page_url(), stack=stack if stack and stack != text else None)
+
+    def on_console(m: Any) -> None:
+        if m.type != "error":
+            return
+        text = m.text
+        # the browser's own note for a request that got 4xx/5xx: the request is already listed
+        if text.startswith("Failed to load resource"):
+            return
+        a = target()
+        if a is None:
+            return
+        loc = None
+        try:
+            l = m.location
+            if l and l.get("url"):
+                loc = f"{l['url']}:{l.get('lineNumber', 0)}"
+        except Exception:
+            pass
+        a.browser_event("console", text, loc)
+
+    def on_response(r: Any) -> None:
+        if r.status < 400 or _FAVICON.search(r.url):
+            return
+        a = target()
+        if a is not None:
+            a.browser_event("request", r.status_text, r.url, r.request.method, r.status)
+
+    def on_failed(r: Any) -> None:
+        why = r.failure or ""
+        if _ABORTED.search(why):
+            return  # navigating away
+        a = target()
+        if a is not None:
+            a.browser_event("request", why or "Request failed", r.url, r.method)
+
+    def on_close(*_: Any) -> None:
+        a = target()
+        if a is not None:
+            _closed_at[a.test_id] = now_ms()
+
+    for event, fn in (("pageerror", on_error), ("console", on_console), ("response", on_response), ("requestfailed", on_failed), ("close", on_close)):
+        try:
+            page.on(event, safe(fn))
+        except Exception:
+            pass
+
+
+def webm_duration_ms(path: str) -> float:
+    """The length of a .webm recording in ms, from its header (Segment Info: TimecodeScale and Duration). 0 when unknown."""
+    import struct
+    try:
+        with open(path, "rb") as f:
+            b = f.read(4096)
+    except OSError:
+        return 0.0
+    scale_ns = 1_000_000.0  # TimecodeScale, default 1 ms
+    i = b.find(b"\x2a\xd7\xb1")
+    if i >= 0 and i + 4 <= len(b):
+        n = b[i + 3] & 0x7F
+        if 0 < n <= 8 and i + 4 + n <= len(b):
+            scale_ns = float(int.from_bytes(b[i + 4:i + 4 + n], "big"))
+    i = b.find(b"\x44\x89")
+    while i >= 0:
+        n = b[i + 2] & 0x7F if i + 2 < len(b) else 0
+        if n in (4, 8) and i + 3 + n <= len(b):
+            ticks = struct.unpack(">f" if n == 4 else ">d", b[i + 3:i + 3 + n])[0]
+            return max(0.0, ticks * scale_ns / 1_000_000)
+        i = b.find(b"\x44\x89", i + 1)
+    return 0.0
+
+
 def _remember_page(attempt: Attempt, page: Any) -> None:
     if page is None:
         return
+    if not hasattr(page, "_impl_obj"):
+        # expect() holds Playwright's internal objects: use the page the test sees, so it is remembered (and watched) once
+        page = getattr(page, "_pw_api_instance_", None) or page
     pages: List[Any] = attempt.__dict__.setdefault("_rl_pages", [])
     if not any(p() is page for p in pages):
         pages.append(weakref.ref(page))
+        _watch(attempt, page)
     try:
         b = page.context.browser
         name = f"{b.browser_type.name} {b.version}" if b else "browser"
@@ -444,13 +563,17 @@ def after_teardown(item: Any, attempt: Attempt) -> None:
         else:
             return
     have = {a.name for a in attempt.attachments}
+    closed = _closed_at.pop(attempt.test_id, None)
     for f in sorted(folder.iterdir()):
         if not f.is_file():
             continue
         if f.suffix == ".zip" and "trace" in f.name:
             attempt.attach("trace", path=str(f), content_type="application/zip")
         elif f.suffix == ".webm":
-            attempt.attach("video", path=str(f), content_type="video/webm")
+            length = webm_duration_ms(str(f))
+            # the first frame, so the report can play the video in step with the steps
+            first = closed - length if closed and length > 0 else None
+            attempt.attach("video", path=str(f), content_type="video/webm", video_start=first)
         elif f.suffix == ".png" and "screenshot" not in have:
             attempt.attach(f.stem, path=str(f), content_type="image/png")
 

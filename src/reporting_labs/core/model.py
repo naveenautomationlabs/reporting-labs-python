@@ -38,6 +38,7 @@ class Attachment:
     content_type: str
     body: Optional[bytes] = None
     path: Optional[str] = None
+    video_start: Optional[float] = None   # a video: ms since epoch of its first frame, when known
 
 
 @dataclass
@@ -82,6 +83,7 @@ class Attempt:
         self.logs: List[Dict[str, Any]] = []
         self.data: List[Dict[str, Any]] = []        # raw data blocks: {name, data}
         self.api: List[Dict[str, Any]] = []
+        self.browser: List[Dict[str, Any]] = []     # what the page reported: {t, kind, text, url?, method?, status?, stack?}
         self.attachments: List[Attachment] = []
         self.errors: List[ErrorInfo] = []
         self.meta: Dict[str, Any] = {}
@@ -134,9 +136,27 @@ class Attempt:
         with self.lock:
             self.api.append(call)
 
-    def attach(self, name: str, body: Optional[bytes] = None, content_type: str = "application/octet-stream", path: Optional[str] = None) -> None:
+    def attach(self, name: str, body: Optional[bytes] = None, content_type: str = "application/octet-stream", path: Optional[str] = None,
+               video_start: Optional[float] = None) -> None:
         with self.lock:
-            self.attachments.append(Attachment(name=str(name), content_type=content_type, body=body, path=path))
+            self.attachments.append(Attachment(name=str(name), content_type=content_type, body=body, path=path, video_start=video_start))
+
+    def browser_event(self, kind: str, text: str, url: Optional[str] = None, method: Optional[str] = None,
+                      status: Optional[int] = None, stack: Optional[str] = None) -> None:
+        """Something the browser reported: an uncaught error, a console.error, a request that failed or got 4xx/5xx."""
+        with self.lock:
+            if len(self.browser) >= 50:
+                return
+            e: Dict[str, Any] = {"t": now_ms(), "kind": kind, "text": str(text or "")}
+            if url:
+                e["url"] = str(url)
+            if method:
+                e["method"] = str(method)
+            if status:
+                e["status"] = int(status)
+            if stack:
+                e["stack"] = str(stack)
+            self.browser.append(e)
 
     def add_error(self, err: ErrorInfo) -> None:
         with self.lock:

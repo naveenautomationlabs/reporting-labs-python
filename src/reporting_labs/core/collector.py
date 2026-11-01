@@ -267,10 +267,23 @@ class Run:
             "logs": [{"t": l["t"], "msg": m.mask_str(str(l["msg"]))} for l in sorted(a.logs, key=lambda x: x["t"])],
             "data": [self._data_block(d["name"], d["data"]) for d in a.data],
             "api": [self._api(c) for c in a.api],
+            **({"browser": [self._browser_event(e) for e in sorted(a.browser, key=lambda x: x["t"])]} if a.browser else {}),
         }
 
+    def _browser_event(self, e: Dict[str, Any]) -> Dict[str, Any]:
+        m = self.masker
+        out: Dict[str, Any] = {"t": e["t"], "kind": e["kind"], "text": m.mask_str(str(e.get("text") or ""))}
+        for k in ("url", "stack"):
+            if e.get(k):
+                out[k] = m.mask_str(str(e[k]))
+        if e.get("method"):
+            out["method"] = str(e["method"])
+        if e.get("status"):
+            out["status"] = int(e["status"])
+        return out
+
     def _step(self, s: Step) -> Dict[str, Any]:
-        d: Dict[str, Any] = {"title": self.masker.mask_str(s.title), "category": s.category, "duration": s.duration, "steps": [self._step(c) for c in s.steps]}
+        d: Dict[str, Any] = {"title": self.masker.mask_str(s.title), "category": s.category, "start": s.start, "duration": s.duration, "steps": [self._step(c) for c in s.steps]}
         if s.error:
             d["error"] = self.masker.mask_str(ANSI.sub("", s.error))
         if s.status:
@@ -349,6 +362,8 @@ class Run:
     def _attachment(self, a: Attachment, t: TestRecord, assets: Path) -> Optional[Dict[str, Any]]:
         opts = self.options
         out: Dict[str, Any] = {"name": self.masker.mask_str(a.name), "contentType": a.content_type}
+        if a.video_start:
+            out["videoStart"] = a.video_start
         embed = opts.get("embedAttachments") is not False
         limit = int(opts.get("embedLimit") or 2 * 1024 * 1024)
         ct = a.content_type or ""

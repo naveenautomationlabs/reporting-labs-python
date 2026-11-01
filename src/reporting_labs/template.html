@@ -516,6 +516,21 @@ html,body{-webkit-font-smoothing:antialiased}
 .list{top:12px;max-height:calc(100vh - 24px)}
 /* one column (phones, narrow windows): the list scrolls away instead of staying pinned over the test detail below it */
 @media (max-width:900px){.list{position:static;max-height:60vh}}
+/* ---------- what the browser saw; video in step with the steps ---------- */
+.bev-list{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.bev{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:4px 12px;padding:8px 12px;border-top:1px solid var(--line);font-size:13px;align-items:start}
+.bev:first-child{border-top:0}
+.bev .k{font-weight:600;font-size:12px;padding-top:1px} .bev.error .k,.bev.request .k{color:var(--fail)} .bev.console .k{color:var(--flaky-ink)}
+.bev .m{min-width:0;overflow-wrap:anywhere;color:var(--ink);line-height:1.45} .bev .m code{font:12px var(--mono)} .bev .u{font:11.5px var(--mono);color:var(--ink-3)}
+.bev .w{font-size:12px;color:var(--ink-3);white-space:nowrap;padding-top:1px} .bev.near{background:var(--fail-bg)} .bev.near .w{color:var(--fail);font-weight:600}
+.bev details summary{font-size:12px;color:var(--ink-3);cursor:pointer;margin-top:2px} .bev pre{font:11.5px/1.45 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 0;color:var(--ink-2)}
+@media (max-width:640px){.bev{grid-template-columns:1fr auto} .bev .m{grid-column:1/-1;grid-row:2}}
+.bev-jump{display:block;margin-top:10px;padding:0;background:none;border:0;font:500 12.5px var(--sans);color:var(--fail);text-align:left;cursor:pointer} .bev-jump:hover{text-decoration:underline}
+.vsync{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px} .vsync .hint{flex:1;min-width:180px;color:var(--ink-3);font-size:12px}
+.vplay{flex:none;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--accent-2);font-size:8px;line-height:1;cursor:pointer;display:inline-grid;place-items:center;padding:0 0 0 1px}
+.vplay:hover{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.step.now{background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
+@media print{.vplay,.vsync .btn,.bev-jump{display:none}}
 .tools{padding:12px;gap:8px;background:var(--surface)}
 .tools input,.tools select{border-radius:8px;background:var(--bg);border-color:var(--line)}
 .tools input:focus,.tools select:focus{border-color:var(--accent);outline:0;box-shadow:0 0 0 3px var(--accent-tint)}
@@ -1799,10 +1814,31 @@ function renderDetail(t, d, retryIdx){
   const r=t.results[retry]; if(!r){ d.append(h('p',{class:'empty'},'This test did not run.')); return; }
   const body=h('div',{});
   if(t.note&&retry===t.results.length-1) body.append(h('div',{class:'note '+(t.outcome==='passed'?'ok':'warn')}, t.note));
-  if(r.errors.length){ body.append(h('h4',{},r.errors.length>1?'Errors':'Error'), ...r.errors.map(errorView)); }
-  if(r.steps.length){ const stepTotal=Math.max(1, r.duration||0, r.steps.reduce((a,x)=>a+x.duration,0)); const tree=stepTree(r.steps, stepTotal), nested=r.steps.some(x=>x.steps.length);
+  const failedRun=r.status!=='passed'&&r.status!=='skipped', fail=failedRun? failMoment(r) : null;
+  const bsec=browserView(r, fail);
+  if(r.errors.length){ body.append(h('h4',{},r.errors.length>1?'Errors':'Error'), ...r.errors.map(errorView));
+    const near=fail!=null? (r.browser||[]).filter(e=>e.t<=fail&&fail-e.t<=5000).length : 0;
+    if(near&&bsec) body.append(h('button',{class:'bev-jump',type:'button',onclick:()=>bsec.scrollIntoView({block:'start',behavior:'smooth'})}, 'The browser reported '+near+' problem'+(near>1?'s':'')+' in the 5 seconds before this failure. See what the browser saw ↓')); }
+  if(bsec&&failedRun) body.append(bsec);
+  // the video's first frame on the wall clock: given by the runner (Java, Python: page closed minus the video's
+  // length), or for Playwright on Node.js the moment the page was created. Steps can then play it from their own moment.
+  const allVids=r.attachments.filter(a=>a.src&&a.contentType.startsWith('video/')), v0=allVids.length? (allVids[0].videoStart||videoStart(r.steps)) : null;
+  let sync=null;
+  if(v0!=null){
+    const figs=allVids.map(videoFigure), v=figs[0].v, tree=()=>body.querySelectorAll('.step[data-s]');
+    sync={ from:v0, seek:abs=>{ v.currentTime=Math.max(0,(abs-v0)/1000); v.play().catch(()=>{}); v.scrollIntoView({block:'nearest',behavior:'smooth'}); } };
+    // a step that starts after the recording ended (closing the browser) has nothing to show
+    v.addEventListener('loadedmetadata',()=>{ if(!isFinite(v.duration)) return; const end=v0+v.duration*1000; for(const b of body.querySelectorAll('.vplay[data-s]')) if(+b.dataset.s>=end) b.hidden=true; });
+    v.addEventListener('timeupdate',()=>{ const at=v0+v.currentTime*1000; let cur=null; for(const el of tree()){ if(el.offsetParent&&+el.dataset.s<=at&&at<=+el.dataset.e) cur=el; } for(const el of body.querySelectorAll('.step.now')) if(el!==cur) el.classList.remove('now'); if(cur) cur.classList.add('now'); });
+    body.append(h('h4',{},allVids.length>1?'Videos':'Video'), h('div',{class:'vsync'},
+      h('span',{class:'hint'},'In step with the test: the step playing lights up below. Click ▶ on a step to watch it.'),
+      fail!=null? h('button',{class:'btn primary',type:'button',onclick:()=>sync.seek(fail-5000)},'▶ Watch the failure') : null),
+      h('div',{class:'vids'}, figs.map(f=>f.fig)));
+  }
+  if(r.steps.length){ const stepTotal=Math.max(1, r.duration||0, r.steps.reduce((a,x)=>a+x.duration,0)); const tree=stepTree(r.steps, stepTotal, sync), nested=r.steps.some(x=>x.steps.length);
     body.append(h('h4',{class:'st-h'},data.bdd?'Scenario steps':'Steps', h('span',{class:'hint'},'bar = share of '+ms(stepTotal)),
       nested? h('span',{class:'st-tools'}, h('button',{type:'button',onclick:()=>setSteps(tree,false)},'Expand all'), h('button',{type:'button',onclick:()=>setSteps(tree,true)},'Collapse all')) : null), tree); }
+  if(bsec&&!failedRun) body.append(bsec);
   if(r.logs.length){ const t0=r.startTime; body.append(h('h4',{},'Log'), h('div',{class:'logs'}, r.logs.map(l=>h('div',{class:'ln'+(/\b(error|fail|exception)\b/i.test(l.msg)?' err':/\bwarn/i.test(l.msg)?' warn':'')}, h('span',{class:'ts'},'+'+ms(Math.max(0,l.t-t0))), h('span',{class:'lm'},l.msg))))); }
   for(const b of r.data){ body.append(h('h4',{},b.name), dataBlock(b)); }
   if(r.api.length){ body.append(h('h4',{},r.api.length+' API call'+(r.api.length>1?'s':'')), ...r.api.map(c=>apiPanel(c,r))); body.append(h('div',{class:'mask-note'},'Secrets and auth headers are masked as ****')); }
@@ -1816,9 +1852,7 @@ function renderDetail(t, d, retryIdx){
   for(const a of imgs){ const m=a.name.match(/^(.*)-(expected|actual|diff)(\.\w+)?$/); if(m){ const set=cmp.get(m[1])||{}; set[m[2]]=a; cmp.set(m[1],set); } }
   const plainImgs=imgs.filter(a=>!/-(expected|actual|diff)(\.\w+)?$/.test(a.name));
   for(const [name,set] of cmp) if(set.expected&&set.actual) body.append(h('h4',{},'Visual comparison · '+name), compare(set)); else for(const k of Object.keys(set)) plainImgs.push(set[k]);
-  if(vids.length){ body.append(h('h4',{},vids.length>1?'Videos':'Video'), h('div',{class:'vids'}, vids.map(a=>{ const fig=h('figure',{}); const v=h('video',{src:a.src,controls:'',preload:'metadata',playsinline:''});
-    v.addEventListener('error',()=>{ const code=v.error&&v.error.code; const why=code===4?'The file is missing, or it is not a format this browser can play.':code===2?'The file could not be read.':'The file could not be decoded.'; v.replaceWith(h('div',{class:'att-err'}, h('b',{},'Video could not be loaded.'), ' '+why+' Expected at ', h('code',{},a.src), '. Common causes: on macOS, Chrome cannot read files next to a report opened from Downloads, Desktop or Documents until you allow it under System Settings → Privacy & Security → Files and Folders (or move the project elsewhere); or the assets folder was replaced by a newer run. Setting embedVideos: true in the reporter options puts videos inside the HTML and avoids both.')); });
-    fig.append(v, h('figcaption',{}, a.name, a.size?h('span',{},' · '+kb(a.size)):null, ' · ', h('a',{href:a.src,download:'',target:'_blank',rel:'noopener',title:'Downloads when the report is served over http; opens in a new tab when opened as a file'},'download'))); return fig; }))); }
+  if(vids.length&&v0==null){ body.append(h('h4',{},vids.length>1?'Videos':'Video'), h('div',{class:'vids'}, vids.map(a=>videoFigure(a).fig))); }
   if(plainImgs.length){ body.append(h('h4',{},plainImgs.length>1?'Screenshots':'Screenshot'), h('div',{class:'att'}, plainImgs.map(a=>h('figure',{}, h('img',{src:a.src,alt:a.name,loading:'lazy',onclick:()=>lightbox(a.src)}), h('figcaption',{},a.name))))); }
   if(traces.length){ body.append(h('h4',{},'Trace'), h('div',{class:'trace'}, traces.map(a=>h('div',{class:'trace-card'},
     h('div',{}, h('b',{},a.name), a.size?h('span',{style:'color:var(--ink-3)'},' · '+kb(a.size)):null),
@@ -1832,15 +1866,43 @@ function renderDetail(t, d, retryIdx){
   if(!body.children.length) body.append(h('p',{style:'color:var(--ink-3)'}, r.status==='skipped'?'Skipped — nothing was executed.'+(skipReason(t)?' Reason: '+skipReason(t):''):'Passed with no steps or attachments recorded.'));
   d.append(body);
 }
-function stepTree(steps, total){
+function videoFigure(a){ const fig=h('figure',{}); const v=h('video',{src:a.src,controls:'',preload:'metadata',playsinline:''});
+    v.addEventListener('error',()=>{ const code=v.error&&v.error.code; const why=code===4?'The file is missing, or it is not a format this browser can play.':code===2?'The file could not be read.':'The file could not be decoded.'; v.replaceWith(h('div',{class:'att-err'}, h('b',{},'Video could not be loaded.'), ' '+why+' Expected at ', h('code',{},a.src), '. Common causes: on macOS, Chrome cannot read files next to a report opened from Downloads, Desktop or Documents until you allow it under System Settings → Privacy & Security → Files and Folders (or move the project elsewhere); or the assets folder was replaced by a newer run. Setting embedVideos: true in the reporter options puts videos inside the HTML and avoids both.')); });
+    fig.append(v, h('figcaption',{}, a.name, a.size?h('span',{},' · '+kb(a.size)):null, ' · ', h('a',{href:a.src,download:'',target:'_blank',rel:'noopener',title:'Downloads when the report is served over http; opens in a new tab when opened as a file'},'download'))); return {fig, v}; }
+/* Playwright starts recording a page's video when the page is created: the first "Create page" step ends at the
+   video's 0:00 (measured within ~20ms). Without that step (other runners) the video is not lined up with steps. */
+function videoStart(steps){ for(const s of steps){ if(s.category==='pw:api'&&/^Create page\b/.test(s.title)&&s.start!=null) return s.start+s.duration; const k=videoStart(s.steps); if(k!=null) return k; } return null; }
+/* When the test failed: the end of the first step that failed, else the end of the attempt. */
+function failMoment(r){ let at=null; const walk=ss=>{ for(const s of ss){ if(s.error&&s.start!=null) at=at==null? s.start+s.duration : Math.min(at, s.start+s.duration); walk(s.steps); } }; walk(r.steps); return at!=null? at : r.startTime+r.duration; }
+/* What the browser reported while the test ran (captured by reporting-labs/auto): uncaught JavaScript errors,
+   console.error and failed requests, timed against the failure. */
+function browserView(r, fail){
+  const ev=r.browser||[]; if(!ev.length) return null;
+  const count=k=>ev.filter(e=>e.kind===k).length;
+  const parts=[[count('error'),'JavaScript error'],[count('console'),'console error'],[count('request'),'failed request']].filter(x=>x[0]).map(([c,l])=>c+' '+l+(c>1?'s':''));
+  const when=e=> fail!=null? (e.t<=fail? ms(fail-e.t)+' before the failure' : ms(e.t-fail)+' after it') : 'at '+ms(Math.max(0,e.t-r.startTime));
+  const label=e=> e.kind==='error'?'JS error':e.kind==='console'?'console.error':e.status?'HTTP '+e.status:'No response';
+  const row=e=>h('div',{class:'bev '+e.kind+(fail!=null&&e.t<=fail&&fail-e.t<=5000?' near':'')},
+    h('span',{class:'k'},label(e)),
+    h('div',{class:'m'}, e.kind==='request'? [h('code',{},(e.method?e.method+' ':'')+e.url), e.text? h('div',{class:'u'},e.text) : null] : [h('div',{},e.text), e.url? h('div',{class:'u'},e.url) : null],
+      e.stack&&e.stack!==e.text? h('details',{}, h('summary',{},'Stack'), h('pre',{},e.stack)) : null),
+    h('span',{class:'w'},when(e)));
+  const shown=ev.slice(-30), sec=h('div',{class:'bev-sec'});
+  sec.append(h('h4',{},'What the browser saw', h('span',{class:'hint'},parts.join(' · ')+(ev.length>shown.length?' · the last '+shown.length+' shown':''))), h('div',{class:'bev-list'}, shown.map(row)));
+  return sec;
+}
+function stepTree(steps, total, sync){
   return h('ul',{class:'steps'}, steps.map(s=>{
     const bad=!!s.error, skip=s.status==='skipped', kids=s.steps.length>0, pct=total?Math.min(100,s.duration/total*100):0;
     // a step with sub-steps starts collapsed; the path to a failure starts open unless expandFailedSteps is false
     const li=h('li',{class:kids&&(data.options.expandFailedSteps===false||!hasError(s))?'collapsed':''});
-    const row=h('div',{class:'step'+(bad?' bad':'')+(skip?' skip':'')},
-      h('span',{class:'tw'}, kids? '▸' : ''), data.bdd?null:h('span',{class:'cat'},s.category), gherkin(s.title), total&&!skip? h('span',{class:'tb',title:Math.round(pct)+'% of the test'}, h('i',{class:pct>=30?'slow':'',style:'width:'+Math.max(pct,s.duration>0?1.5:0)+'%'})) : null, h('span',{class:'d'},skip?'not run':ms(s.duration)));
+    const timed=s.start!=null&&!skip;
+    const row=h('div',{class:'step'+(bad?' bad':'')+(skip?' skip':''),'data-s':timed?s.start:null,'data-e':timed?s.start+s.duration:null},
+      h('span',{class:'tw'}, kids? '▸' : ''), data.bdd?null:h('span',{class:'cat'},s.category), gherkin(s.title), total&&!skip? h('span',{class:'tb',title:Math.round(pct)+'% of the test'}, h('i',{class:pct>=30?'slow':'',style:'width:'+Math.max(pct,s.duration>0?1.5:0)+'%'})) : null, h('span',{class:'d'},skip?'not run':ms(s.duration)),
+      // only for steps the video shows: not the browser launch and page setup that end before recording starts
+      sync&&timed&&s.start+s.duration>sync.from+100? h('button',{class:'vplay',type:'button','data-s':s.start,title:'Play the video from this step','aria-label':'Play the video from this step',onclick:e=>{e.stopPropagation();sync.seek(s.start);}},'▶') : null);
     if(kids){ row.style.cursor='pointer'; row.addEventListener('click',()=>{li.classList.toggle('collapsed'); row.querySelector('.tw').textContent=li.classList.contains('collapsed')?'▸':'▾';}); if(!li.classList.contains('collapsed')) row.querySelector('.tw').textContent='▾'; }
-    li.append(row); if(bad) li.append(h('div',{class:'e'},s.error)); if(kids) li.append(stepTree(s.steps, total));
+    li.append(row); if(bad) li.append(h('div',{class:'e'},s.error)); if(kids) li.append(stepTree(s.steps, total, sync));
     return li;
   }));
 }

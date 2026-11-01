@@ -111,3 +111,45 @@ def test_star_line_once_a_week_never_in_ci(tmp_path):
     mark.unlink()
     assert writer.star_line({"CI": "true"}, mark) is None and writer.star_line({"REPORTING_LABS_NO_STAR": "1"}, mark) is None
     assert not mark.exists()
+
+
+def test_browser_events_and_video_start(tmp_path):
+    from reporting_labs import transport
+    run, opts = _run(tmp_path, {"API_TOKEN": "s3cretTok3n99"})
+    run.test("t", "t", [], "t.py", 1, "proj")
+    a = Attempt("t")
+    a.browser_event("request", "Internal Server Error", "https://shop.test/api?token=s3cretTok3n99", "POST", 500)
+    a.browser_event("error", "TypeError: x is undefined", "https://shop.test/cart", stack="TypeError: x is undefined\n    at app.js:1")
+    for i in range(60):
+        a.browser_event("console", f"noise {i}")
+    video = tmp_path / "video.webm"
+    video.write_bytes(b"\x1a\x45\xdf\xa3")
+    a.attach("video", path=str(video), content_type="video/webm", video_start=a.start + 250)
+    a.finish("failed")
+    # pytest-xdist hands the attempt over as JSON
+    run.add_attempt("t", transport.load(transport.dump(a)))
+    r = run.build()["tests"][0]["results"][0]
+    assert len(r["browser"]) == 50
+    assert r["browser"][0] == {"t": r["browser"][0]["t"], "kind": "request", "text": "Internal Server Error", "url": "https://shop.test/api?token=****", "method": "POST", "status": 500}
+    assert r["browser"][1]["stack"].startswith("TypeError")
+    assert r["attachments"][0]["videoStart"] == a.start + 250
+    assert all("start" in s for s in r["steps"])
+
+
+def test_no_browser_key_without_events(tmp_path):
+    run, opts = _run(tmp_path)
+    run.test("t", "t", [], "t.py", 1, "proj")
+    a = Attempt("t"); a.finish("passed"); run.add_attempt("t", a)
+    assert "browser" not in run.build()["tests"][0]["results"][0]
+
+
+def test_webm_duration(tmp_path):
+    from reporting_labs.playwright_support import webm_duration_ms
+    import struct
+    # Segment Info with TimecodeScale 1 000 000 ns and Duration 2500.0 (a 4-byte float)
+    f = tmp_path / "v.webm"
+    f.write_bytes(b"\x1a\x45\xdf\xa3\x80" + b"\x2a\xd7\xb1\x83\x0f\x42\x40" + b"\x44\x89\x84" + struct.pack(">f", 2500.0))
+    assert webm_duration_ms(str(f)) == 2500.0
+    (tmp_path / "bad.webm").write_bytes(b"nothing")
+    assert webm_duration_ms(str(tmp_path / "bad.webm")) == 0.0
+    assert webm_duration_ms(str(tmp_path / "missing.webm")) == 0.0
