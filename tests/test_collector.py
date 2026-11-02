@@ -153,3 +153,31 @@ def test_webm_duration(tmp_path):
     (tmp_path / "bad.webm").write_bytes(b"nothing")
     assert webm_duration_ms(str(tmp_path / "bad.webm")) == 0.0
     assert webm_duration_ms(str(tmp_path / "missing.webm")) == 0.0
+
+
+def test_each_video_starts_with_its_own_page(tmp_path):
+    """pytest-playwright saves a test's recordings as video-1.webm, video-2.webm in the order the pages opened:
+    each one's first frame is its own page's close time minus its length."""
+    import struct
+    from reporting_labs.playwright_support import _sequence, _video_start
+
+    def webm(name, ms):
+        f = tmp_path / name
+        f.write_bytes(b"\x1a\x45\xdf\xa3\x80" + b"\x2a\xd7\xb1\x83\x0f\x42\x40" + b"\x44\x89\x84" + struct.pack(">f", ms))
+        return f
+
+    class P:  # a page: only its identity matters
+        pass
+
+    a = Attempt("t")
+    main, popup = P(), P()
+    _sequence(a, main, None)
+    _sequence(a, popup, 1_000_400.0)
+    a._rl_seq[0]["closed"], a._rl_seq[1]["closed"] = 1_008_000.0, 1_004_400.0
+    assert _video_start(a, webm("video-1.webm", 8000.0), False, None) == 1_000_000.0
+    assert _video_start(a, webm("video-2.webm", 4000.0), False, None) == 1_000_400.0
+    # a recording that does not fit the page that opened at that place is left unsynced
+    assert _video_start(a, webm("video-2.webm", 1000.0), False, None) is None
+    # one video: the last page close of the test, as before
+    b = Attempt("u")
+    assert _video_start(b, webm("video.webm", 2000.0), True, 1_002_000.0) == 1_000_000.0

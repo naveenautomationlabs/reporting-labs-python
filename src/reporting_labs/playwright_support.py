@@ -204,13 +204,74 @@ def _watch(attempt: Attempt, page: Any) -> None:
     def on_close(*_: Any) -> None:
         a = target()
         if a is not None:
-            _closed_at[a.test_id] = now_ms()
+            t = now_ms()
+            _closed_at[a.test_id] = t
+            for e in a.__dict__.get("_rl_seq", []):
+                if e["ref"]() is page:
+                    e["closed"] = t
+
+    # pages this one's context opens later (a popup, a new tab): watched as they open, in the order they open,
+    # which is the order pytest-playwright numbers their videos in (video-1.webm, video-2.webm, ...)
+    ctx = None
+    try:
+        ctx = page.context
+    except Exception:
+        pass
+    if ctx is not None and not getattr(ctx, "_rl_hooked", False):
+        try:
+            ctx._rl_hooked = True
+            for p in ctx.pages:
+                _sequence(attempt, p, None)
+
+            def on_page(p: Any) -> None:
+                a = context.current() or first()
+                if a is not None:
+                    _sequence(a, p, now_ms())
+                    _remember_page(a, p)
+            ctx.on("page", safe(on_page))
+        except Exception:
+            pass
+    _sequence(attempt, page, None)
 
     for event, fn in (("pageerror", on_error), ("console", on_console), ("response", on_response), ("requestfailed", on_failed), ("close", on_close)):
         try:
             page.on(event, safe(fn))
         except Exception:
             pass
+
+
+def _sequence(attempt: Attempt, page: Any, opened: Optional[float]) -> None:
+    """The test's pages in the order they opened, with when they opened and closed (ms since epoch)."""
+    seq: List[Dict[str, Any]] = attempt.__dict__.setdefault("_rl_seq", [])
+    if any(e["ref"]() is page for e in seq):
+        return
+    try:
+        seq.append({"ref": weakref.ref(page), "opened": opened, "closed": None})
+    except TypeError:
+        pass
+
+
+def _video_start(attempt: Attempt, file: Path, single: bool, fallback: Optional[float]) -> Optional[float]:
+    """The first frame of one of the test's videos: its page closed minus the video's length."""
+    length = webm_duration_ms(str(file))
+    if length <= 0:
+        return None
+    m = re.fullmatch(r"video(?:-(\d+))?\.webm", file.name)
+    seq = attempt.__dict__.get("_rl_seq", [])
+    entry = None
+    if m:
+        i = int(m.group(1)) - 1 if m.group(1) else 0
+        entry = seq[i] if 0 <= i < len(seq) else None
+    closed = entry["closed"] if entry else None
+    if closed is None and single:
+        closed = fallback
+    if not closed:
+        return None
+    first = closed - length
+    # a recording starts when its page opens: if this one does not fit that page, it is some other page's
+    if entry and entry.get("opened") and abs(first - entry["opened"]) > 1500:
+        return None
+    return first
 
 
 def webm_duration_ms(path: str) -> float:
@@ -564,18 +625,23 @@ def after_teardown(item: Any, attempt: Attempt) -> None:
             return
     have = {a.name for a in attempt.attachments}
     closed = _closed_at.pop(attempt.test_id, None)
-    for f in sorted(folder.iterdir()):
+    webms = [f for f in folder.iterdir() if f.is_file() and f.suffix == ".webm"]
+    for f in sorted(folder.iterdir(), key=_natural):
         if not f.is_file():
             continue
         if f.suffix == ".zip" and "trace" in f.name:
             attempt.attach("trace", path=str(f), content_type="application/zip")
         elif f.suffix == ".webm":
-            length = webm_duration_ms(str(f))
             # the first frame, so the report can play the video in step with the steps
-            first = closed - length if closed and length > 0 else None
+            first = _video_start(attempt, f, len(webms) == 1, closed)
             attempt.attach("video", path=str(f), content_type="video/webm", video_start=first)
         elif f.suffix == ".png" and "screenshot" not in have:
             attempt.attach(f.stem, path=str(f), content_type="image/png")
+
+
+def _natural(p: Path) -> tuple:
+    """video-2.webm before video-10.webm."""
+    return tuple(int(x) if x.isdigit() else x for x in re.split(r"(\d+)", p.name))
 
 
 def env_rows() -> List[Dict[str, str]]:

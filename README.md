@@ -132,7 +132,8 @@ pytest --tracing retain-on-failure --video retain-on-failure
 The browser is watched too: uncaught JavaScript errors, `console.error` messages and requests that failed or got a
 4xx/5xx land under **What the browser saw** on a failed test, timed against the failure ("HTTP 500 · POST
 /api/cart/coupon · 3.0s before the failure"). With `--video`, the video sits above the steps: click ▶ on a step to
-watch that moment, or **Watch the failure** for the 5 seconds before it.
+watch that moment, or **Watch the failure** for the 5 seconds before it. A popup or second tab has its own recording,
+and every player follows the steps.
 
 The sync and async APIs both work. See `examples/pytest-playwright`.
 

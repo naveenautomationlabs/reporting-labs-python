@@ -316,6 +316,7 @@ li.collapsed>ul{display:none}
 .vids figure{margin:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#000}
 .vids video{width:100%;display:block;max-height:420px;background:#000}
 .vids figcaption{font:11px var(--mono);padding:6px 8px;color:var(--ink-2);background:var(--surface-2)}
+.vids figure{transition:opacity .2s} .vids figure.off{opacity:.45}
 .trace-card{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:13px}
 .trace-how{color:var(--ink-2);font-size:12px} .trace-how code{font:12px var(--mono);background:var(--surface-2);padding:1px 5px;border-radius:3px}
 .trace-card .dl{align-self:flex-start;font-size:12px;padding:6px 10px;border:1px solid var(--accent);border-radius:var(--radius);text-decoration:none}
@@ -1820,18 +1821,36 @@ function renderDetail(t, d, retryIdx){
     const near=fail!=null? (r.browser||[]).filter(e=>e.t<=fail&&fail-e.t<=5000).length : 0;
     if(near&&bsec) body.append(h('button',{class:'bev-jump',type:'button',onclick:()=>bsec.scrollIntoView({block:'start',behavior:'smooth'})}, 'The browser reported '+near+' problem'+(near>1?'s':'')+' in the 5 seconds before this failure. See what the browser saw ↓')); }
   if(bsec&&failedRun) body.append(bsec);
-  // the video's first frame on the wall clock: given by the runner (Java, Python: page closed minus the video's
-  // length), or for Playwright on Node.js the moment the page was created. Steps can then play it from their own moment.
-  const allVids=r.attachments.filter(a=>a.src&&a.contentType.startsWith('video/')), v0=allVids.length? (allVids[0].videoStart||videoStart(r.steps)) : null;
+  // each video's first frame on the wall clock: given by the runner (Node.js: when its page opened; Java, Python: the
+  // page closed minus the video's length), or for an older Node.js report the first video from its "Create page" step.
+  // A popup or second tab has its own recording: every player follows the steps, each from its own start.
+  const allVids=r.attachments.filter(a=>a.src&&a.contentType.startsWith('video/')),
+    starts=allVids.map((a,i)=>a.videoStart||(i===0? videoStart(r.steps) : null)), v0=starts.some(x=>x!=null)? Math.min(...starts.filter(x=>x!=null)) : null;
   let sync=null;
   if(v0!=null){
-    const figs=allVids.map(videoFigure), v=figs[0].v, tree=()=>body.querySelectorAll('.step[data-s]');
-    sync={ from:v0, seek:abs=>{ v.currentTime=Math.max(0,(abs-v0)/1000); v.play().catch(()=>{}); v.scrollIntoView({block:'nearest',behavior:'smooth'}); } };
-    // a step that starts after the recording ended (closing the browser) has nothing to show
-    v.addEventListener('loadedmetadata',()=>{ if(!isFinite(v.duration)) return; const end=v0+v.duration*1000; for(const b of body.querySelectorAll('.vplay[data-s]')) if(+b.dataset.s>=end) b.hidden=true; });
-    v.addEventListener('timeupdate',()=>{ const at=v0+v.currentTime*1000; let cur=null; for(const el of tree()){ if(el.offsetParent&&+el.dataset.s<=at&&at<=+el.dataset.e) cur=el; } for(const el of body.querySelectorAll('.step.now')) if(el!==cur) el.classList.remove('now'); if(cur) cur.classList.add('now'); });
-    body.append(h('h4',{},allVids.length>1?'Videos':'Video'), h('div',{class:'vsync'},
-      h('span',{class:'hint'},'In step with the test: the step playing lights up below. Click ▶ on a step to watch it.'),
+    const many=allVids.length>1;
+    const figs=allVids.map((a,i)=>videoFigure(a, many? 'page '+(i+1)+(starts[i]!=null&&i>0? ', opened at '+ms(Math.max(0,starts[i]-r.startTime)) : '') : null)),
+      players=figs.map((f,i)=>({...f, s0:starts[i]})).filter(p=>p.s0!=null), tree=()=>body.querySelectorAll('.step[data-s]');
+    const len=p=>isFinite(p.v.duration)? p.v.duration*1000 : Infinity, covers=(p,abs)=>abs>=p.s0&&abs<=p.s0+len(p);
+    const light=at=>{ let cur=null; for(const el of tree()){ if(el.offsetParent&&+el.dataset.s<=at&&at<=+el.dataset.e) cur=el; } for(const el of body.querySelectorAll('.step.now')) if(el!==cur) el.classList.remove('now'); if(cur) cur.classList.add('now'); };
+    const show=(p,on)=>{ if(many){ p.fig.classList.toggle('off',!on); } };
+    sync={ from:v0, seek:abs=>{
+      // the players recording at that moment play from it; the others wait (dimmed) and join when their page opens
+      let first=null;
+      for(const p of players){ if(covers(p,abs)){ p.v.currentTime=(abs-p.s0)/1000; p.v.play().catch(()=>{}); show(p,true); first=first||p; } else { p.v.pause(); p.v.currentTime=abs<p.s0||!isFinite(len(p))? 0 : len(p)/1000; show(p,false); } }
+      if(!first){ first=players.reduce((a,b)=>b.s0<a.s0?b:a); first.v.currentTime=Math.max(0,(abs-first.s0)/1000); first.v.play().catch(()=>{}); show(first,true); }
+      first.v.scrollIntoView({block:'nearest',behavior:'smooth'}); } };
+    // a step that starts after every recording ended (closing the browser) has nothing to show
+    const hideLate=()=>{ if(players.some(p=>!isFinite(p.v.duration))) return; const end=Math.max(...players.map(p=>p.s0+len(p))); for(const b of body.querySelectorAll('.vplay[data-s]')) if(+b.dataset.s>=end) b.hidden=true; };
+    for(const p of players){
+      p.v.addEventListener('loadedmetadata',hideLate);
+      p.v.addEventListener('timeupdate',()=>{ if(many&&p.fig.classList.contains('off')) return; const at=p.s0+p.v.currentTime*1000; light(at);
+        // a page opened while this one plays: start its recording too
+        if(many&&!p.v.paused) for(const o of players) if(o!==p&&o.v.paused&&covers(o,at)&&o.v.currentTime*1000<at-o.s0-400){ o.v.currentTime=(at-o.s0)/1000; o.v.play().catch(()=>{}); show(o,true); } });
+      if(many) p.v.addEventListener('ended',()=>show(p,false));
+    }
+    body.append(h('h4',{},many?'Videos':'Video'), h('div',{class:'vsync'},
+      h('span',{class:'hint'}, many? 'In step with the test: each page (a popup, a second tab) has its own recording, and they play together. The step playing lights up below. Click ▶ on a step to watch it.' : 'In step with the test: the step playing lights up below. Click ▶ on a step to watch it.'),
       fail!=null? h('button',{class:'btn primary',type:'button',onclick:()=>sync.seek(fail-5000)},'▶ Watch the failure') : null),
       h('div',{class:'vids'}, figs.map(f=>f.fig)));
   }
@@ -1866,9 +1885,9 @@ function renderDetail(t, d, retryIdx){
   if(!body.children.length) body.append(h('p',{style:'color:var(--ink-3)'}, r.status==='skipped'?'Skipped — nothing was executed.'+(skipReason(t)?' Reason: '+skipReason(t):''):'Passed with no steps or attachments recorded.'));
   d.append(body);
 }
-function videoFigure(a){ const fig=h('figure',{}); const v=h('video',{src:a.src,controls:'',preload:'metadata',playsinline:''});
+function videoFigure(a, label){ const fig=h('figure',{}); const v=h('video',{src:a.src,controls:'',preload:'metadata',playsinline:''});
     v.addEventListener('error',()=>{ const code=v.error&&v.error.code; const why=code===4?'The file is missing, or it is not a format this browser can play.':code===2?'The file could not be read.':'The file could not be decoded.'; v.replaceWith(h('div',{class:'att-err'}, h('b',{},'Video could not be loaded.'), ' '+why+' Expected at ', h('code',{},a.src), '. Common causes: on macOS, Chrome cannot read files next to a report opened from Downloads, Desktop or Documents until you allow it under System Settings → Privacy & Security → Files and Folders (or move the project elsewhere); or the assets folder was replaced by a newer run. Setting embedVideos: true in the reporter options puts videos inside the HTML and avoids both.')); });
-    fig.append(v, h('figcaption',{}, a.name, a.size?h('span',{},' · '+kb(a.size)):null, ' · ', h('a',{href:a.src,download:'',target:'_blank',rel:'noopener',title:'Downloads when the report is served over http; opens in a new tab when opened as a file'},'download'))); return {fig, v}; }
+    fig.append(v, h('figcaption',{}, a.name, label?h('span',{},' · '+label):null, a.size?h('span',{},' · '+kb(a.size)):null, ' · ', h('a',{href:a.src,download:'',target:'_blank',rel:'noopener',title:'Downloads when the report is served over http; opens in a new tab when opened as a file'},'download'))); return {fig, v}; }
 /* Playwright starts recording a page's video when the page is created: the first "Create page" step ends at the
    video's 0:00 (measured within ~20ms). Without that step (other runners) the video is not lined up with steps. */
 function videoStart(steps){ for(const s of steps){ if(s.category==='pw:api'&&/^Create page\b/.test(s.title)&&s.start!=null) return s.start+s.duration; const k=videoStart(s.steps); if(k!=null) return k; } return null; }
