@@ -4,7 +4,7 @@
 [![Docs](https://img.shields.io/badge/docs-reportinglabs.dev-1A56DB.svg)](https://reportinglabs.dev)
 [![Support reportingLabs](https://img.shields.io/badge/%E2%99%A5%20Support-reportingLabs-E5405E?style=flat)](https://reportinglabs.dev/support)
 
-**One beautiful HTML report for pytest, Playwright, Selenium and Robot Framework.** It tells you what broke,
+**One beautiful HTML report for pytest, pytest-bdd, Behave, Playwright, Selenium and Robot Framework.** It tells you what broke,
 who owns it, and whether it is new. The whole report is a single self-contained HTML file: no server, no
 upload, no login. Open it in a browser, attach it to a CI job, or drop it in Slack.
 
@@ -21,7 +21,7 @@ pip install reporting-labs
 ```
 
 That is all. The pytest plugin turns on the moment the package is installed. For Robot Framework, add one
-listener flag (below).
+listener flag; for Behave, one line in each hook of `features/environment.py` (both below).
 
 ## pytest
 
@@ -119,6 +119,80 @@ every scenario reads like a Cucumber report.
 - **The browser** the steps used (pytest-playwright) is the project.
 
 Works with pytest-bdd 6 to 9 (data tables and doc strings need pytest-bdd 8+).
+
+## Behave
+
+Using Behave (reporting-labs 0.1.15+)? No pytest needed: call reportingLabs from Behave's own hooks in
+`features/environment.py`, one line per hook.
+
+```python
+# features/environment.py
+from reporting_labs.behave import ReportingLabs
+
+
+def before_all(context):
+    context.rl = ReportingLabs()  # options: reporting-labs.config.json
+
+
+def before_scenario(context, scenario):
+    context.rl.before_scenario(scenario)
+    # ...your own set-up: a browser context, a page...
+
+
+def before_step(context, step):
+    context.rl.before_step(step)
+
+
+def after_step(context, step):
+    context.rl.after_step(step)
+
+
+def after_scenario(context, scenario):
+    context.rl.after_scenario(scenario)  # first: the failure screenshot
+    # ...then close your browser context
+
+
+def after_all(context):
+    context.rl.after_all()  # writes reporting-labs/index.html
+```
+
+If your hooks already do other work, keep it and add the `context.rl...` line to each. Then run `behave` as usual.
+
+- **One row per scenario**, at its `.feature` file and line, under its Feature (and Rule). A Scenario Outline row
+  is named after its values and shows its Examples row as a data block.
+- **Every Gherkin step**, Background included, with its time. The Playwright, Selenium and requests/httpx calls of a
+  step nest under it. Data tables and doc strings become data blocks.
+- **The failing step** carries the error, with the `.feature` lines around it; the steps after it show as
+  *not run*. An undefined step fails the scenario with the step definition to write. A scenario skipped in a hook
+  (`scenario.skip("reason")`) shows as skipped.
+- **Tags:** `@P1` and `@critical` set priority and severity, `@owner:asha` (or any key the report knows, such as
+  `@feature:checkout` or `@story:SHOP-12`) sets that meta, anything else is a tag.
+- **Run again:** every scenario shows `behave features/cart.feature:12`, and the failed ones copy as one command.
+- **Playwright:** a screenshot of every open page is attached when a scenario fails, and "What the browser saw"
+  lists the page's JavaScript errors, `console.error` and failed requests. Pass the scenario's browser context to get
+  its trace and video too, in step with the steps:
+
+  ```python
+  def before_scenario(context, scenario):
+      context.rl.before_scenario(scenario)
+      context.browser_context = context.browser.new_context(
+          record_video_dir="test-results/videos")
+      # only if you want the trace:
+      context.browser_context.tracing.start(screenshots=True, snapshots=True)
+      context.page = context.browser_context.new_page()
+
+
+  def after_scenario(context, scenario):
+      # screenshot, the trace if it failed, the video; closes the browser context
+      context.rl.after_scenario(scenario, browser_context=context.browser_context)
+  ```
+
+  `trace="on"` keeps the trace of every scenario, `trace="off"` none (default: `"retain-on-failure"`).
+- **Selenium:** a screenshot of every open browser is attached when a scenario fails.
+- `log()`, `test_data()`, `attach()`, `step()` and `api()` work inside step definitions, as in pytest.
+
+Options go in `reporting-labs.config.json` or as keyword arguments: `ReportingLabs(title="Checkout", outputFolder="reports/rl")`.
+Works with Behave 1.2.6 and later. See `examples/behave-playwright`.
 
 ## Playwright
 

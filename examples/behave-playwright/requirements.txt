@@ -1,0 +1,3 @@
+reporting-labs>=0.1.15
+behave
+playwright

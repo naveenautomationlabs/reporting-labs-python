@@ -95,3 +95,21 @@ def for_item(item: Any) -> Tuple[Dict[str, str], List[str]]:
     except Exception:
         pass
     return result
+
+
+def tag_meta(tags: List[str], keys: List[str]):
+    """Split Gherkin tags the way the Cucumber JVM plugin does: priority, severity and key:value meta vs real tags."""
+    meta: Dict[str, str] = {}
+    rest: List[str] = []
+    for raw in tags:
+        tag = str(raw).lstrip("@")
+        m = re.match(r"^([A-Za-z_-]+)[:=](.+)$", tag)
+        if m and m.group(1).lower() in keys:
+            meta.setdefault(m.group(1).lower(), m.group(2))
+        elif re.match(r"^P[0-4]$", tag, re.I) and "priority" in keys:
+            meta.setdefault("priority", tag.upper())
+        elif re.match(r"^(blocker|critical|major|normal|minor|trivial)$", tag, re.I) and "severity" in keys:
+            meta.setdefault("severity", tag.lower())
+        else:
+            rest.append(raw)
+    return meta, rest

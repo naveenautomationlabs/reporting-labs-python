@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "reporting-labs"
 dynamic = ["version"]
-description = "A beautiful test report in one HTML file, for pytest, Playwright, Selenium and Robot Framework. It tells you what broke, who owns it, and whether it is new."
+description = "A beautiful test report in one HTML file, for pytest, pytest-bdd, Behave, Playwright, Selenium and Robot Framework. It tells you what broke, who owns it, and whether it is new."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "Naveen Khunteta", email = "naveenanimation20@gmail.com" }]
-keywords = ["pytest", "playwright", "selenium", "robotframework", "test-report", "html-report", "reporting", "allure-alternative"]
+keywords = ["pytest", "playwright", "selenium", "robotframework", "behave", "bdd", "gherkin", "test-report", "html-report", "reporting", "allure-alternative"]
 classifiers = [
     "Framework :: Pytest",
     "Framework :: Robot Framework",
@@ -25,7 +25,7 @@ dependencies = []
 
 [project.optional-dependencies]
 pytest = ["pytest>=7.0"]
-dev = ["pytest>=7.0", "pytest-xdist>=3.0", "pytest-rerunfailures>=12.0", "pytest-timeout>=2.1", "requests>=2.25", "httpx>=0.23", "playwright>=1.40", "selenium>=4.10", "robotframework>=6.0"]
+dev = ["pytest>=7.0", "pytest-xdist>=3.0", "pytest-rerunfailures>=12.0", "pytest-timeout>=2.1", "requests>=2.25", "httpx>=0.23", "playwright>=1.40", "selenium>=4.10", "robotframework>=6.0", "behave>=1.2.6"]
 
 [project.urls]
 Homepage = "https://reportinglabs.dev"
